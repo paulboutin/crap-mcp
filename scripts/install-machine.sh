@@ -38,7 +38,10 @@ npm ci --no-audit --no-fund
 npm run build
 release=$(mktemp -d "$data/releases/build.XXXXXXXX")
 mkdir -p "$release/.agents"
-cp -R dist dashboard package.json package-lock.json "$release/"
+cp -R dist dashboard languages .oxlintrc.json package.json package-lock.json "$release/"
+mkdir -p "$release/tools/oxlint" "$release/scripts"
+cp -R tools/oxlint/anti-slop "$release/tools/oxlint/"
+cp scripts/ensure-service.sh "$release/scripts/"
 cp -R .agents/skills "$release/.agents/"
 (cd "$release" && npm ci --omit=dev --no-audit --no-fund)
 previous=$(readlink "$data/current" || true)
@@ -56,14 +59,11 @@ with open(path + ".new", "wb") as stream:
 os.replace(path + ".new", path)
 PY
 launchctl bootout "$domain/$label" 2>/dev/null || true
-launchctl bootstrap "$domain" "$plist"
-ready=0
-for ((i=0; i<50; i++)); do
-  if [[ $(curl -fsS --max-time 1 "$url/health" 2>/dev/null || true) == crap-score-mcp ]]; then ready=1; break; fi
-  sleep .2
-done
-if [[ $ready != 1 ]]; then
-  if [[ -n "$previous" ]]; then switch_release "$previous"; launchctl kickstart -k "$domain/$label"; fi
+if ! bash "$release/scripts/ensure-service.sh" --restart; then
+  if [[ -n "$previous" ]]; then
+    switch_release "$previous"
+    bash "$release/scripts/ensure-service.sh" --restart
+  fi
   echo "Service did not start. See $data/service.log" >&2
   exit 1
 fi

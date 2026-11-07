@@ -1,0 +1,42 @@
+{
+  "id": "python",
+  "wasm": "https://cdn.jsdelivr.net/npm/@repomix/tree-sitter-wasms@0.1.17/out/tree-sitter-python.wasm",
+  "bytes": 460119,
+  "sha256": "36d25eee776af6293dc67bdf6f8f820af6a26bbc49e335cc4821dfd5a0dac685",
+  "core": false,
+  "extensions": [
+    ".py"
+  ],
+  "functions": [
+    "function_definition",
+    "lambda"
+  ],
+  "containers": [
+    "class_definition"
+  ],
+  "controls": [
+    "if_statement",
+    "elif_clause",
+    "for_statement",
+    "while_statement",
+    "except_clause",
+    "conditional_expression"
+  ],
+  "decisions": [
+    "boolean_operator",
+    "case_clause",
+    "for_in_clause",
+    "if_clause"
+  ],
+  "nesting": [
+    "match_statement"
+  ],
+  "linter": {
+    "name": "Ruff",
+    "command": [
+      "ruff",
+      "check",
+      "."
+    ]
+  }
+}

@@ -1,3 +1,9 @@
+import {
+  languageChange,
+  setLanguage,
+  qualityPolicy,
+} from "./quality-policy.ts";
+import { recentRuns } from "./check-history.ts";
 import { basename, isAbsolute, join } from "node:path";
 import { z } from "zod";
 import { digest, readJson, repository, writeJson } from "./files.ts";
@@ -31,17 +37,23 @@ export class Projects {
     return { id, root };
   }
 
-  desk(id = "") {
+  repo(id: string) {
     const root = this.roots.get(id);
 
     if (!root) throw Error("Unknown project. Use register_project first.");
     const repo = repository(root);
 
     if (repo.root !== root) throw Error("Registered checkout moved");
+
+    return repo;
+  }
+  desk(id = "") {
+    const repo = this.repo(id);
     const cached = this.desks.get(id);
 
     if (
       cached &&
+      JSON.stringify(cached.repo.packs) === JSON.stringify(repo.packs) &&
       JSON.stringify(cached.repo.config) === JSON.stringify(repo.config)
     )
       return cached;
@@ -80,6 +92,44 @@ export function sharedServer(projects: Projects) {
     () => ({
       content: [{ type: "text", text: JSON.stringify(projects.list()) }],
     }),
+  );
+
+  server.registerTool(
+    "get_project_settings",
+    {
+      description:
+        "Read this checkout's lint rules, coverage targets, rule changes and last 30 measured check outcomes before choosing the next change.",
+      inputSchema: { project: z.string() },
+    },
+    ({ project }) => {
+      const repo = projects.repo(project);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              ...qualityPolicy(repo),
+              runs: recentRuns(repo),
+            }),
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerTool(
+    "set_project_language",
+    {
+      description:
+        "Set one language on the selected checkout using its current settings revision. Enable downloads and verifies only this parser. Optionally enable its already-installed native linter.",
+      inputSchema: languageChange,
+    },
+    async (q) => {
+      const state = await setLanguage(projects.repo(q.project), q);
+
+      return { content: [{ type: "text", text: JSON.stringify(state) }] };
+    },
   );
 
   return server;

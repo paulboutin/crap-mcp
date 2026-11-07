@@ -1,0 +1,50 @@
+{
+  "id": "tsx",
+  "wasm": "core/tree-sitter-tsx.wasm",
+  "bytes": 1450769,
+  "sha256": "28fd7df7f2531af8deefa41c42b1f38a42b16141f8864d335439704eaf6cb465",
+  "core": true,
+  "extensions": [
+    ".tsx"
+  ],
+  "functions": [
+    "function_declaration",
+    "function_expression",
+    "generator_function",
+    "generator_function_declaration",
+    "method_definition",
+    "arrow_function",
+    "init_declaration",
+    "deinit_declaration",
+    "lambda_literal"
+  ],
+  "containers": [
+    "class_declaration",
+    "abstract_class_declaration",
+    "class",
+    "object",
+    "internal_module",
+    "protocol_declaration"
+  ],
+  "controls": [
+    "if_statement",
+    "for_statement",
+    "for_in_statement",
+    "while_statement",
+    "do_statement",
+    "repeat_while_statement",
+    "guard_statement",
+    "catch_clause",
+    "catch_block",
+    "ternary_expression"
+  ],
+  "decisions": [
+    "switch_case",
+    "conjunction_expression",
+    "disjunction_expression",
+    "nil_coalescing_expression"
+  ],
+  "nesting": [
+    "switch_statement"
+  ]
+}

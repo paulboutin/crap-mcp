@@ -1,3 +1,4 @@
+import { adapter } from "./languages.ts";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
@@ -29,12 +30,12 @@ export function receipt(repo: Repo) {
 }
 
 export function fingerprint(repo: Repo) {
-  const parts: string[] = [];
+  const parts: string[] = repo.packs.map((id) => adapter(id).version);
 
   for (const file of workFiles(repo)) {
     if (
-      !supported(file) &&
-      !/(?:^|\/)(?:\.crap\.json|[^/]*lock[^/]*|Package\.swift|[^/]*\.(?:js|jsx|mjs|cjs|json))$/.test(
+      !supported(file, repo.packs) &&
+      !/(?:^|\/)(?:\.crap\.json|[^/]*lock[^/]*|Package\.swift|pyproject\.toml|Cargo\.toml|go\.(?:mod|sum)|requirements[^/]*\.txt|[^/]*\.(?:js|jsx|mjs|cjs|json))$/.test(
         file,
       )
     )

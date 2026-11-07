@@ -20,7 +20,7 @@ import {
 } from "./files.ts";
 import { fingerprint, receipt, type Receipt } from "./coverage.ts";
 import { health, healthSchema } from "./findings.ts";
-import { parse, type Routine } from "./syntax.ts";
+import { parse, prepareLanguage, type Routine } from "./syntax.ts";
 
 import { reconcile } from "./reconcile.ts";
 
@@ -160,6 +160,7 @@ export async function scan(
   cache: Map<string, Routine[]>,
 ) {
   checkConfig(repo);
+  await Promise.all(repo.packs.map(prepareLanguage));
 
   const input = fingerprint(repo),
     run = receipt(repo),
@@ -179,6 +180,8 @@ export async function scan(
     inspectWorkFile(repo, s, file, cache, run);
     progress.done++;
   }
+
+  checkConfig(repo);
 
   if (input !== fingerprint(repo) || head !== maybeRevision(repo.root, "HEAD"))
     throw Error("Source changed during scan; refresh again");

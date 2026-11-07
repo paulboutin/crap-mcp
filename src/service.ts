@@ -14,7 +14,7 @@ import {
 } from "./scan.ts";
 import { sessionSummary } from "./session.ts";
 import { review } from "./review.ts";
-import type { Routine } from "./syntax.ts";
+import { prepareLanguage, type Routine } from "./syntax.ts";
 
 export class Desk {
   readonly repo: Repo;
@@ -130,7 +130,7 @@ export function analysisServer(select: (id?: string) => Desk, shared: boolean) {
     "analyze_function_health",
     {
       description:
-        "Inspect a TypeScript or Swift symbol by repository-relative path and name or line. Returns measured evidence and matching findings.",
+        "Inspect a symbol in an enabled language by repository-relative path and name or line. Returns measured evidence and matching findings.",
       inputSchema: inspect.extend(scope),
     },
     async (q) => {
@@ -161,6 +161,8 @@ export function analysisServer(select: (id?: string) => Desk, shared: boolean) {
           last: desk.latest ? meta(desk.latest) : null,
         });
       }
+
+      await Promise.all(desk.repo.packs.map(prepareLanguage));
 
       const baseline =
         q.view === "integration" ? integrationView(desk.repo) : null;

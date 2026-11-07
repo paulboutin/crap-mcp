@@ -1,73 +1,41 @@
 import { Parser, Language, type Node } from "web-tree-sitter";
-import { fileURLToPath } from "node:url";
+import {
+  acquireGrammar,
+  adapter,
+  languages,
+  languageFor,
+  type Adapter,
+} from "./languages.ts";
 import { digest } from "./files.ts";
 
 await Parser.init();
 
-async function grammar(name: string) {
-  const parser = new Parser();
-  parser.setLanguage(
-    await Language.load(
-      fileURLToPath(
-        import.meta.resolve(
-          "@repomix/tree-sitter-wasms/out/tree-sitter-" + name + ".wasm",
-        ),
-      ),
-    ),
-  );
+const parsers = new Map<string, Parser>();
 
-  return parser;
+const loading = new Map<string, Promise<void>>();
+
+async function loadParser(pack: Adapter) {
+  const grammar = await Language.load(await acquireGrammar(pack));
+  const parser = new Parser();
+  parser.setLanguage(grammar);
+  parsers.set(pack.id, parser);
 }
 
-const parsers = {
-  typescript: await grammar("typescript"),
-  tsx: await grammar("tsx"),
-  swift: await grammar("swift"),
-};
+export async function prepareLanguage(id: string) {
+  if (parsers.has(id)) return;
+  let pending = loading.get(id);
 
-const functions = new Set([
-  "function_declaration",
-  "function_expression",
-  "generator_function",
-  "generator_function_declaration",
-  "method_definition",
-  "arrow_function",
-  "init_declaration",
-  "deinit_declaration",
-  "lambda_literal",
-]);
+  if (!pending) {
+    pending = loadParser(adapter(id)).finally(() => loading.delete(id));
+    loading.set(id, pending);
+  }
 
-const containers = new Set([
-  "class_declaration",
-  "abstract_class_declaration",
-  "class",
-  "object",
-  "internal_module",
-  "protocol_declaration",
-]);
+  await pending;
+}
 
-const controls = new Set([
-  "if_statement",
-  "for_statement",
-  "for_in_statement",
-  "while_statement",
-  "do_statement",
-  "repeat_while_statement",
-  "guard_statement",
-  "catch_clause",
-  "catch_block",
-  "ternary_expression",
-]);
-
-const decisions = new Set([
-  ...controls,
-  "switch_case",
-  "conjunction_expression",
-  "disjunction_expression",
-  "nil_coalescing_expression",
-]);
-
-const nesting = new Set([...controls, "switch_statement"]);
+for (const pack of languages) {
+  if (pack.core) await prepareLanguage(pack.id);
+}
 
 export interface Routine {
   symbol: string;
@@ -85,8 +53,23 @@ function nameOf(node: Node) {
   return node.childForFieldName("name")?.text;
 }
 
+function containerName(node: Node) {
+  const name = nameOf(node) ?? node.childForFieldName("type")?.text;
+
+  return name ? name + "." : "";
+}
+
 function label(node: Node) {
   const name = nameOf(node);
+
+  if (name && node.type === "method_declaration") {
+    const receiver = node
+      .childForFieldName("receiver")
+      ?.namedChild(0)
+      ?.childForFieldName("type")?.text;
+
+    if (receiver) return receiver + "." + name;
+  }
 
   if (name) return name;
   const owner = node.parent;
@@ -100,11 +83,18 @@ function label(node: Node) {
   return node.type.replace("_declaration", "");
 }
 
-function decision(node: Node) {
+function decision(node: Node, language: Adapter) {
   if (node.type === "do_statement")
     return Boolean(node.childForFieldName("condition"));
 
-  if (decisions.has(node.type)) return true;
+  if (node.type === "match_arm")
+    return node.childForFieldName("pattern")?.text !== "_";
+
+  if (
+    language.decisions.includes(node.type) ||
+    language.controls.includes(node.type)
+  )
+    return true;
 
   if (node.type === "switch_entry")
     return !node.namedChildren.some(
@@ -117,10 +107,15 @@ function decision(node: Node) {
   );
 }
 
-function addMetrics(node: Node, r: Routine, depth: number) {
-  const next = depth + Number(nesting.has(node.type));
+function addMetrics(node: Node, r: Routine, depth: number, language: Adapter) {
+  const next =
+    depth +
+    Number(
+      language.nesting.includes(node.type) ||
+        language.controls.includes(node.type),
+    );
 
-  if (decision(node)) r.complexity++;
+  if (decision(node, language)) r.complexity++;
 
   if (next > r.depth) {
     r.depth = next;
@@ -131,6 +126,7 @@ function addMetrics(node: Node, r: Routine, depth: number) {
 }
 
 interface Walk {
+  language: Adapter;
   rows: Routine[];
   counts: Map<string, number>;
 }
@@ -151,7 +147,7 @@ function routine(node: Node, scope: string, state: Walk) {
     hash: digest(node.text),
     // A line hit in the enclosing call cannot prove a one-line callback ran.
     omit:
-      node.parent?.type === "arguments" &&
+      ["arguments", "argument_list"].includes(node.parent?.type ?? "") &&
       node.startPosition.row === node.endPosition.row
         ? [[node.startPosition.row + 1, node.endPosition.row + 1]]
         : [],
@@ -169,7 +165,7 @@ function visit(
   owner: Routine | undefined,
   depth: number,
 ) {
-  if (functions.has(node.type)) {
+  if (state.language.functions.includes(node.type)) {
     if (
       ["function_declaration", "method_definition"].includes(node.type) &&
       !node.childForFieldName("body")
@@ -180,11 +176,11 @@ function visit(
     owner = child;
     scope = child.symbol + ".";
     depth = 0;
-  } else if (containers.has(node.type) && nameOf(node)) {
-    scope += nameOf(node) + ".";
+  } else if (state.language.containers.includes(node.type)) {
+    scope += containerName(node);
   }
 
-  if (owner) depth = addMetrics(node, owner, depth);
+  if (owner) depth = addMetrics(node, owner, depth, state.language);
 
   for (const child of node.namedChildren) {
     if (child) visit(child, scope, state, owner, depth);
@@ -204,12 +200,10 @@ function uniqueCallbacks(rows: Routine[]) {
 }
 
 export function parse(file: string, source: string) {
-  const parser = file.endsWith(".swift")
-    ? parsers.swift
-    : file.endsWith(".tsx")
-      ? parsers.tsx
-      : parsers.typescript;
+  const language = languageFor(file);
 
+  if (!language) throw Error("Unsupported source extension: " + file);
+  const parser = parsers.get(language.id)!;
   const tree = parser.parse(source);
 
   if (!tree) throw Error("Parser did not produce a tree");
@@ -217,7 +211,7 @@ export function parse(file: string, source: string) {
   try {
     if (tree.rootNode.hasError)
       throw Error("Syntax error or unsupported grammar");
-    const state: Walk = { rows: [], counts: new Map() };
+    const state: Walk = { rows: [], counts: new Map(), language };
     visit(tree.rootNode, "", state, undefined, 0);
 
     return uniqueCallbacks(state.rows);

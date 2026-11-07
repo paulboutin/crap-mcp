@@ -1,0 +1,37 @@
+{
+  "id": "go",
+  "wasm": "https://cdn.jsdelivr.net/npm/@repomix/tree-sitter-wasms@0.1.17/out/tree-sitter-go.wasm",
+  "bytes": 218901,
+  "sha256": "7ca9e17e2b4fe236cb1d2386b0dfa897d7f13016cb88c1a5c8c1140719e5e514",
+  "core": false,
+  "extensions": [
+    ".go"
+  ],
+  "functions": [
+    "function_declaration",
+    "method_declaration",
+    "func_literal"
+  ],
+  "containers": [],
+  "controls": [
+    "if_statement",
+    "for_statement"
+  ],
+  "decisions": [
+    "expression_case",
+    "type_case",
+    "communication_case"
+  ],
+  "nesting": [
+    "expression_switch_statement",
+    "type_switch_statement",
+    "select_statement"
+  ],
+  "linter": {
+    "name": "Staticcheck",
+    "command": [
+      "staticcheck",
+      "./..."
+    ]
+  }
+}

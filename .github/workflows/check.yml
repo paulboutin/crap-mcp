@@ -26,6 +26,7 @@ jobs:
           fi
           CRAP_BASE="$base" npm run check
           node scripts/prove.mjs
+          node scripts/prove-packs.mjs
           CRAP_BASE="$base" node scripts/dashboard.mjs
       - name: Save the self-review dashboard
         uses: actions/upload-artifact@v4

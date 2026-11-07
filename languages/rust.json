@@ -1,0 +1,42 @@
+{
+  "id": "rust",
+  "wasm": "https://cdn.jsdelivr.net/npm/@repomix/tree-sitter-wasms@0.1.17/out/tree-sitter-rust.wasm",
+  "bytes": 1116077,
+  "sha256": "a96b69c6fdf9d75b7df225af7e3544443cbd91c518dff3d7864bbef2463f57f0",
+  "core": false,
+  "extensions": [
+    ".rs"
+  ],
+  "functions": [
+    "function_item",
+    "closure_expression"
+  ],
+  "containers": [
+    "impl_item",
+    "trait_item",
+    "mod_item"
+  ],
+  "controls": [
+    "if_expression",
+    "for_expression",
+    "while_expression",
+    "loop_expression"
+  ],
+  "decisions": [
+    "match_arm"
+  ],
+  "nesting": [
+    "match_expression"
+  ],
+  "linter": {
+    "name": "Clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ]
+  }
+}

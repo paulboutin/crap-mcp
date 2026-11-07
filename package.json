@@ -24,21 +24,21 @@
     "dashboard": "npm run build && node scripts/dashboard.mjs",
     "summary": "npm run build --silent && node scripts/summary.mjs",
     "install:machine": "bash scripts/install-machine.sh",
-    "machine": "npm run build && node dist/machine.js"
+    "machine": "npm run build && node dist/machine.js",
+    "prove:packs": "npm run build && node scripts/prove-packs.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
-    "@repomix/tree-sitter-wasms": "0.1.17",
+    "@oxlint/plugins": "1.92.0",
+    "oxlint": "1.92.0",
     "web-tree-sitter": "0.27.2",
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@oxlint/plugins": "1.92.0",
     "@types/express": "^5.0.6",
     "@types/jsdom": "27.0.0",
     "@types/node": "24.19.2",
     "jsdom": "27.4.0",
-    "oxlint": "1.92.0",
     "prettier": "3.9.10",
     "typescript": "6.0.3"
   }

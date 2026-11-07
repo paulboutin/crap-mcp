@@ -1,0 +1,52 @@
+{
+  "id": "typescript",
+  "wasm": "core/tree-sitter-typescript.wasm",
+  "bytes": 1418221,
+  "sha256": "13677574a6375e1b12e98579850c55a4db5952ad8bacd673110007ac7cfd7e69",
+  "core": true,
+  "extensions": [
+    ".ts",
+    ".mts",
+    ".cts"
+  ],
+  "functions": [
+    "function_declaration",
+    "function_expression",
+    "generator_function",
+    "generator_function_declaration",
+    "method_definition",
+    "arrow_function",
+    "init_declaration",
+    "deinit_declaration",
+    "lambda_literal"
+  ],
+  "containers": [
+    "class_declaration",
+    "abstract_class_declaration",
+    "class",
+    "object",
+    "internal_module",
+    "protocol_declaration"
+  ],
+  "controls": [
+    "if_statement",
+    "for_statement",
+    "for_in_statement",
+    "while_statement",
+    "do_statement",
+    "repeat_while_statement",
+    "guard_statement",
+    "catch_clause",
+    "catch_block",
+    "ternary_expression"
+  ],
+  "decisions": [
+    "switch_case",
+    "conjunction_expression",
+    "disjunction_expression",
+    "nil_coalescing_expression"
+  ],
+  "nesting": [
+    "switch_statement"
+  ]
+}

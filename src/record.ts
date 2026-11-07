@@ -3,7 +3,6 @@ import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { join, resolve } from "node:path";
 import { existsSync, statSync } from "node:fs";
-import { pathToFileURL } from "node:url";
 import { fingerprint, receiptSchema } from "./coverage.ts";
 import { repository, writeJson, eligible, type Repo } from "./files.ts";
 import { importReport } from "./importers.ts";
@@ -14,6 +13,8 @@ function stamp(file: string) {
 
   return [s.ino, s.mtimeNs, s.ctimeNs].join(":");
 }
+
+export class SuiteFailed extends Error {}
 
 export function record(
   repo: Repo,
@@ -37,7 +38,7 @@ export function record(
   if (child.error) throw child.error;
 
   if (child.status !== 0)
-    throw Error("Suite did not pass; no coverage recorded");
+    throw new SuiteFailed("Suite did not pass; no coverage recorded");
 
   if (!stamp(file) || before === stamp(file))
     throw Error("Suite did not produce a new report");
@@ -73,10 +74,7 @@ export function record(
   return { run: result.run, snapshot, files: Object.keys(files).length };
 }
 
-if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(resolve(process.argv[1])).href
-) {
+if (import.meta.main) {
   const [report, separator, command, ...args] = process.argv.slice(2);
 
   if (!report || separator !== "--" || !command)

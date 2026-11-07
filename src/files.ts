@@ -8,7 +8,8 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { join, dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { adapter, languageFor } from "./languages.ts";
 import { z } from "zod";
 
 export const digest = (data: string | Buffer) =>
@@ -67,6 +68,8 @@ export function safeFile(root: string, file: string) {
 export const configSchema = z
   .object({
     suite: z.string().min(1).default("unit"),
+    checks: z.array(z.array(z.string().min(1)).min(1)).optional(),
+    report: z.string().min(1).optional(),
     command: z.array(z.string().min(1)).min(1).optional(),
     integrationBranch: z.string().min(1).default("main"),
     exclude: z.array(z.string().min(1)).default([]),
@@ -88,15 +91,25 @@ export function repository(path: string) {
 
   const config = loadConfig(root);
 
-  return {
-    root,
-    config,
-    store: resolve(common, "crap-mcp-v2"),
-    local: resolve(
-      git(root, "rev-parse", "--absolute-git-dir").trim(),
-      "crap-mcp-local-v2",
-    ),
-  };
+  const local = resolve(
+    git(root, "rev-parse", "--absolute-git-dir").trim(),
+    "crap-mcp-local-v2",
+  );
+
+  const packs = projectPacks(local);
+
+  return { root, config, local, packs, store: resolve(common, "crap-mcp-v2") };
+}
+
+function projectPacks(local: string) {
+  const selected = readJson(
+    join(local, "quality-policy.json"),
+    z.object({
+      settings: z.object({ packs: z.array(z.string()).default([]) }),
+    }),
+  );
+
+  return selected?.settings.packs ?? [];
 }
 
 export function policy(repo: Repo) {
@@ -105,11 +118,15 @@ export function policy(repo: Repo) {
       repo.config.suite,
       repo.config.command,
       repo.config.exclude,
+      ...repo.packs.map((id) => adapter(id).version),
     ]),
   );
 }
 
 export function checkConfig(repo: Repo) {
+  if (JSON.stringify(projectPacks(repo.local)) !== JSON.stringify(repo.packs))
+    throw Error("Enabled languages changed; refresh the project");
+
   if (JSON.stringify(loadConfig(repo.root)) !== JSON.stringify(repo.config))
     throw Error("Repository configuration changed; restart the MCP process");
 }
@@ -153,17 +170,29 @@ export function workFiles(repo: Repo) {
   ].sort();
 }
 
-export function supported(file: string) {
-  return /\.(?:[cm]?ts|tsx|swift)$/.test(file) && !/\.d\.[cm]?ts$/.test(file);
+export function supported(file: string, packs: string[] = []) {
+  const lang = languageFor(file);
+
+  return !!lang && (lang.core || packs.includes(lang.id));
 }
 
 export function eligible(repo: Repo, file: string) {
   return (
-    supported(file) &&
+    supported(file, repo.packs) &&
     !file
       .split("/")
       .some((part) =>
-        ["node_modules", "dist", ".build", "coverage", ".git"].includes(part),
+        [
+          "node_modules",
+          "dist",
+          ".build",
+          "coverage",
+          ".git",
+          ".venv",
+          "__pycache__",
+          "target",
+          "vendor",
+        ].includes(part),
       ) &&
     !repo.config.exclude.some((prefix) => file.startsWith(prefix))
   );

@@ -43,7 +43,7 @@ test("one HTTP service isolates same-name checkouts across clients, dashboard se
   async function call(
     client: Client,
     name: string,
-    args: Record<string, string>,
+    args: Record<string, string | boolean>,
   ) {
     const result = await client.callTool({ name, arguments: args });
     const content = result.content[0];
@@ -73,6 +73,67 @@ test("one HTTP service isolates same-name checkouts across clients, dashboard se
       return id;
     }),
   );
+
+  const endpoint = url + "/projects/" + ids[0] + "/settings";
+  const policy = await (await fetch(endpoint)).json();
+
+  const payload = {
+    revision: policy.revision,
+    settings: { ...policy.settings, minCoverage: 80 },
+  };
+
+  const put = {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  };
+
+  assert.equal((await fetch(endpoint, put)).status, 200);
+  assert.equal((await fetch(endpoint, put)).status, 409);
+  assert.equal((await fetch(endpoint, { ...put, body: "{}" })).status, 400);
+  assert.match(await (await fetch(url + "/settings")).text(), /Language packs/);
+  assert.equal(
+    (await call(clients[1], "get_project_settings", { project: ids[1] }))
+      .settings.minCoverage,
+    0,
+  );
+
+  const change = {
+    project: ids[0],
+    language: "swift",
+    enabled: true,
+    linter: true,
+    revision: (await (await fetch(endpoint)).json()).revision,
+  };
+
+  const updated = await call(clients[0], "set_project_language", change);
+  assert.deepEqual((await (await fetch(endpoint)).json()).settings.linters, [
+    "swift",
+  ]);
+  await assert.rejects(
+    call(clients[0], "set_project_language", { ...change, enabled: false }),
+    /Core languages/,
+  );
+  await assert.rejects(
+    call(clients[0], "set_project_language", {
+      ...change,
+      language: "unknown",
+    }),
+    /Unknown language/,
+  );
+  await assert.rejects(
+    call(clients[0], "set_project_language", { ...change, language: "tsx" }),
+    /supported linter/,
+  );
+  await assert.rejects(
+    call(clients[0], "set_project_language", { ...change, linter: false }),
+    /Reload/,
+  );
+  await call(clients[0], "set_project_language", {
+    ...change,
+    revision: updated.revision,
+    linter: false,
+  });
 
   const scans = await Promise.all(
     ids.map((id, i) =>

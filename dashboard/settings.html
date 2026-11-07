@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Project settings</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #f4f6f3;
+        color: #172f36;
+        font:
+          15px/1.5 system-ui,
+          sans-serif;
+      }
+      main {
+        max-width: 1050px;
+        margin: auto;
+        padding: 20px clamp(16px, 4vw, 44px);
+      }
+      h1,
+      h2 {
+        letter-spacing: -0.035em;
+      }
+      h2 {
+        font-size: 1.25rem;
+        margin-top: 0;
+      }
+      section {
+        background: white;
+        border: 1px solid #d8e0db;
+        border-radius: 8px;
+        padding: 18px;
+        margin: 14px 0;
+      }
+      button {
+        padding: 8px 14px;
+        border: 0;
+        border-radius: 5px;
+        color: white;
+        background: #135a50;
+        font: inherit;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.6;
+      }
+      input[type="number"] {
+        width: 6em;
+        padding: 5px;
+      }
+      label {
+        display: block;
+        margin: 8px 0;
+      }
+      fieldset {
+        border: 0;
+        padding: 0;
+      }
+      #rules {
+        columns: 2;
+        overflow-wrap: anywhere;
+      }
+      li {
+        padding: 5px 0;
+      }
+      small {
+        display: block;
+        color: #526668;
+      }
+      p {
+        max-width: 80ch;
+      }
+      #status {
+        font-weight: 600;
+      }
+      @media (max-width: 700px) {
+        #rules {
+          columns: 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Project settings</h1>
+      <div id="status" role="status">Loading…</div>
+      <form hidden>
+        <section>
+          <h2>Check targets</h2>
+          <p>
+            Each scored function must meet both targets. The report also shows
+            the standard CRAP risk bands so scores stay comparable across
+            projects.
+          </p>
+          <label
+            >Maximum CRAP
+            <input
+              id="maxCrap"
+              type="number"
+              min="0.000001"
+              max="1000000"
+              step="any"
+              required
+          /></label>
+          <label
+            >Minimum measured line coverage (%)
+            <input
+              id="minCoverage"
+              type="number"
+              min="0"
+              max="100"
+              step="any"
+              required /></label
+          ><small id="suite"></small>
+        </section>
+        <section>
+          <h2>Language packs</h2>
+          <p>
+            Enable an optional parser to download it once for this machine. Each
+            checkout chooses its own packs.
+          </p>
+          <fieldset id="packs" aria-label="Language packs"></fieldset>
+          <h3>Native linters</h3>
+          <p>
+            Project checks run enabled tools from your installed toolchain.
+            Install the named tool first.
+          </p>
+          <fieldset id="linters" aria-label="Native linters"></fieldset>
+        </section>
+        <section>
+          <h2>Lint rules</h2>
+          <p>
+            Enabled rules run on JavaScript and TypeScript during project
+            checks.
+          </p>
+          <fieldset id="rules" aria-label="Enabled rules"></fieldset>
+        </section>
+        <button>Save settings</button>
+      </form>
+      <section>
+        <h2>Rule and target changes</h2>
+        <ul id="changes"></ul>
+      </section>
+      <section>
+        <h2>Recent checks</h2>
+        <p>
+          Compare runs with the same policy and suite. Each entry records what
+          was tried and the results measured at the time.
+        </p>
+        <ol id="runs"></ol>
+      </section>
+    </main>
+    <script type="module">
+      const by = (id) => document.getElementById(id),
+        form = document.querySelector("form"),
+        status = by("status");
+      const endpoint =
+        "/projects/" +
+        encodeURIComponent(
+          new URLSearchParams(location.search).get("project"),
+        ) +
+        "/settings";
+      let revision;
+      function row(parent, text, detail) {
+        const li = document.createElement("li");
+        li.textContent = text;
+        const small = document.createElement("small");
+        small.textContent = detail;
+        li.append(small);
+        parent.append(li);
+      }
+      function runs(list) {
+        by("runs").replaceChildren();
+        for (const run of list) {
+          const m = run.metrics;
+          const scores = m
+            ? m.measured +
+              "/" +
+              m.total +
+              " functions scored · " +
+              m.skipped +
+              " skipped files · highest CRAP " +
+              (m.worst?.toFixed(2) ?? "—") +
+              " · " +
+              m.covered +
+              "/" +
+              m.executable +
+              " measured lines covered · " +
+              m.overCrap +
+              " over CRAP · " +
+              m.belowCoverage +
+              " below coverage"
+            : "Coverage evidence unavailable";
+          row(
+            by("runs"),
+            new Date(run.at).toLocaleString() +
+              " · " +
+              run.outcome +
+              " · " +
+              (run.note || "Project check"),
+            [
+              run.suite + " tests " + run.tests,
+              "lint " +
+                run.lint.violations +
+                " findings in " +
+                run.lint.files +
+                " files",
+              ...Object.entries(run.lint.rules ?? {}).map(
+                ([rule, n]) => rule + " × " + n,
+              ),
+              scores,
+              "policy " + run.policy.slice(0, 8),
+              run.commit?.slice(0, 8),
+              ...(run.tools ?? []).map(
+                (t) => t.name + " " + (t.error ?? "exit " + t.status),
+              ),
+              run.error,
+              run.lint.error,
+            ]
+              .filter(Boolean)
+              .join(" · "),
+          );
+        }
+        if (!list.length)
+          by("runs").textContent = "No project checks recorded yet.";
+      }
+      async function load() {
+        const response = await fetch(endpoint);
+        if (!response.ok) throw Error("Could not load settings.");
+        const data = await response.json();
+        revision = data.revision;
+        for (const key of ["maxCrap", "minCoverage"])
+          by(key).value = data.settings[key];
+        by("suite").textContent =
+          "Designated suite: " + data.suite + " · Report: " + data.report;
+        for (const key of ["packs", "linters"]) {
+          by(key).replaceChildren();
+          for (const lang of data.languages) {
+            if (key === "linters" && !lang.linter) continue;
+            const label = document.createElement("label"),
+              input = document.createElement("input");
+            input.type = "checkbox";
+            input.value = lang.id;
+            input.disabled = key === "packs" && lang.core;
+            input.checked =
+              input.disabled || data.settings[key].includes(lang.id);
+            const title =
+              key === "linters"
+                ? lang.linter
+                : lang.id +
+                  (lang.core
+                    ? " · included"
+                    : " · " + Math.ceil(lang.bytes / 1024) + " KiB");
+            label.append(input, " " + title);
+            by(key).append(label);
+          }
+        }
+        by("rules").replaceChildren();
+        for (const name of data.catalog) {
+          const label = document.createElement("label"),
+            input = document.createElement("input");
+          input.type = "checkbox";
+          input.value = name;
+          input.checked = data.settings.rules.includes(name);
+          label.append(input, " " + name);
+          by("rules").append(label);
+        }
+        by("changes").replaceChildren();
+        for (const c of data.changes)
+          row(
+            by("changes"),
+            new Date(c.at).toLocaleString() +
+              " · maximum CRAP " +
+              c.maxCrap +
+              " · minimum coverage " +
+              c.minCoverage +
+              "%",
+            [
+              ...c.added.map((x) => "Enabled " + x),
+              ...c.removed.map((x) => "Disabled " + x),
+            ].join(", "),
+          );
+        if (!data.changes.length)
+          by("changes").textContent =
+            "Using the initial policy. No changes recorded.";
+        runs(data.runs);
+        form.hidden = false;
+      }
+      form.onsubmit = async (event) => {
+        event.preventDefault();
+        const button = form.querySelector("button");
+        button.disabled = true;
+        try {
+          const settings = {
+            maxCrap: by("maxCrap").valueAsNumber,
+            minCoverage: by("minCoverage").valueAsNumber,
+            packs: Array.from(
+              by("packs").querySelectorAll(":checked:enabled"),
+              (el) => el.value,
+            ),
+            linters: Array.from(
+              by("linters").querySelectorAll(":checked"),
+              (el) => el.value,
+            ),
+            rules: Array.from(
+              by("rules").querySelectorAll(":checked"),
+              (el) => el.value,
+            ),
+          };
+          const response = await fetch(endpoint, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ revision, settings }),
+          });
+          if (!response.ok) throw Error((await response.json()).error);
+          await load();
+          status.textContent = "Saved for the next project check.";
+        } catch (error) {
+          status.textContent = String(error);
+        } finally {
+          button.disabled = false;
+        }
+      };
+      try {
+        await load();
+        status.textContent = "";
+      } catch (error) {
+        status.textContent = String(error);
+      }
+    </script>
+  </body>
+</html>

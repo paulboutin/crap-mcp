@@ -37,7 +37,7 @@
         color: inherit;
         font: inherit;
         padding: 6px 12px;
-        max-width: 75vw;
+        max-width: min(60vw, 70ch);
       }
       iframe {
         border: 0;
@@ -53,6 +53,7 @@
     <nav>
       <label for="project">Project</label
       ><select id="project" disabled></select>
+      <a id="view" hidden></a>
     </nav>
     <p id="status" role="status">Loading projects…</p>
     <iframe title="Selected project health" hidden></iframe>
@@ -76,7 +77,18 @@
         const report = new URL("/report/" + select.value, location.origin);
         if (query.has("snapshot"))
           report.searchParams.set("snapshot", query.get("snapshot"));
-        frame.src = report.href;
+        const settings = query.get("view") === "settings";
+        const link = document.querySelector("#view");
+        const next = new URL(location.href);
+        next.searchParams.set("project", id);
+        next.searchParams.set("view", settings ? "report" : "settings");
+        link.href = next;
+        link.hidden = false;
+        link.textContent = settings ? "Project report" : "Project settings";
+        frame.title = settings ? "Project settings" : "Selected project health";
+        frame.src = settings
+          ? "/settings?project=" + encodeURIComponent(id)
+          : report.href;
       }
       try {
         const response = await fetch("/projects");
@@ -90,7 +102,9 @@
         }
         select.disabled = !projects.length;
         select.onchange = () => {
-          location.search = new URLSearchParams({ project: select.value });
+          query.set("project", select.value);
+          query.delete("snapshot");
+          location.search = query;
         };
         display();
       } catch (error) {

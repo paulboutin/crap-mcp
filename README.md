@@ -1,6 +1,6 @@
 # CRAP Score MCP
 
-Find functions that combine complex control flow with thin test coverage. This local stdio MCP server scans TypeScript, TSX and Swift, keeps a backlog across Git worktrees, and reviews what changed during a task. No account, API key or hosted service is needed for analysis.
+Find functions that combine complex control flow with thin test coverage. One local HTTP service handles multiple checkouts. It scans TypeScript, TSX and Swift out of the box, supports optional language packs, keeps a backlog across Git worktrees, and reviews what changed during a task. No account, API key or hosted service is needed for analysis.
 
 ## Try it on this repository
 
@@ -24,6 +24,40 @@ Open a new Codex chat in a trusted Git checkout and ask **“Use $crap-developme
 Structural findings work immediately for TypeScript, TSX and Swift. For numeric CRAP scores, configure each project's coverage command and record its passing suite (below). The installed recorder is at `~/.local/share/crap-mcp/current/dist/record.js`. Registering a project writes its path to the local catalog and saves analysis under its Git directory. The machine service listens only on loopback and is intended for a trusted single-user workstation. Local processes can access registered reports and register checkouts. The browser cannot register a project through the picker.
 
 For other platforms or development, run `npm ci && npm run machine` in one server checkout, then run `codex mcp add crap_score --url http://127.0.0.1:47731/mcp` and install the two skill folders in your user skills directory. The foreground service uses the same catalog and API. `CRAP_PORT` and `CRAP_DATA_DIR` override the foreground defaults.
+
+## Project settings, checks and agent feedback
+
+Select the checkout in the dashboard, then open **Project settings**. Each checkout, including a linked worktree, has its own settings, revision and check history in its Git directory. Adjust the maximum raw CRAP per function, minimum measured line coverage per function, and the enabled Oxlint and native lint rules/tools. Save to apply them to the next check. The settings page records newly enabled and removed rules, language packs and target changes. A stale browser tab must reload before saving. The standard dashboard risk bands and session grading rubric still use the documented cross-project thresholds.
+
+Both skills probe the service before use and start the installed launch agent when it is offline. They register the current checkout, read its recent results, enable any required optional parser, then capture a baseline. Development review records each attempted change and reruns the checks. Backlog triage records the starting evidence and uses earlier outcomes when choosing a task. Example: **“Use $crap-development-review, enable Python for this project, and check my change.”**
+
+From the target checkout, run the same workflow manually:
+
+```sh
+bash ~/.local/share/crap-mcp/current/scripts/ensure-service.sh
+node ~/.local/share/crap-mcp/current/dist/project-check.js "Covered the empty-input branch"
+```
+
+The checker runs the bundled Oxlint rules on JS/TS, any opted-in native linters and the project's extra checks, then wraps the designated test command with the coverage recorder. Set `report` in `.crap.json` when the report path differs from `coverage/lcov.info`. The optional `checks` field accepts argument arrays, e.g. `"checks": [["npm", "run", "typecheck"]]`. These commands run from the target checkout when the agent or developer invokes the CLI. For a foreground installation, use `node /path/to/crap-mcp/dist/project-check.js "attempt"`. Standard Oxlint correctness defaults also apply. Native linters use their own project configuration.
+
+Each attempt logs its note, time, commit, suite, policy ID, available lint counts by rule, native command exit status, coverage receipt, measured lines/functions, highest CRAP and target violations. Failed tests log a failed attempt without borrowing an earlier score. Missing coverage or a partial scan yields incomplete evidence. The checker exits nonzero for failed or incomplete runs. The dashboard and `get_project_settings` show the latest 30 attempts. Compare runs with the same suite and policy and use the function diff for attribution. This is local, retrievable feedback for the next agent session. Rules change through explicit settings edits.
+
+## Language packs and native linters
+
+TypeScript, TSX and Swift grammars ship with the service. To add Python, Go or Rust, select its **Language pack** and save. Each optional pack downloads one version-pinned WASM file on first use, verifies its size and SHA-256, then reuses the machine cache. Switching it off removes that language from the project's next scan. Open the settings page again to see settings changed by another client. The server reads syntax directly, so an editor can be closed. Xcode test coverage continues to use the installed `xcrun xccov`.
+
+| Language | Optional native tool | Rule catalog |
+| --- | --- | --- |
+| Python | `ruff check .` | [Ruff](https://docs.astral.sh/ruff/rules/) |
+| Go | `staticcheck ./...` | [Staticcheck](https://staticcheck.dev/docs/checks/) |
+| Rust | `cargo clippy --all-targets -- -D warnings` | [Clippy](https://rust-lang.github.io/rust-clippy/stable/index.html) |
+| Swift | `swiftlint lint --strict` | [SwiftLint](https://github.com/realm/SwiftLint) |
+
+Enable native linters separately. Their executables and any needed project dependencies must already be installed. An unavailable executable is reported as a failed check. Parsers provide structural metrics immediately. To produce numeric scores, the designated suite must emit a supported line-level coverage format for the target source. Convert native formats such as Go coverprofiles to LCOV in the designated command if needed.
+
+The [pack catalog](languages/) lives in this repository. Each manifest declares its extensions, function and scope node types, decision and nesting nodes, grammar location, byte length, SHA-256 and optional linter command. To add a pack outside this repo, copy a manifest such as [Python](languages/python.json) into `~/.local/share/crap-mcp/languages/`, give it a unique ID and extensions, and set `core: false`. Supply a compatible Tree-sitter WASM file by local path relative to the manifest or pinned HTTPS URL. Obtain the digest with `shasum -a 256 FILE` and size with `wc -c < FILE`. Restart the installed service with `launchctl kickstart -k gui/$(id -u)/com.crap-score.machine`; the new option appears in settings. Use trusted manifests, since their optional linter commands execute during CLI checks. Run `npm run prove:packs` for the end-to-end download, activation, scan and deactivation experiment. It uses disposable checkouts and a fresh cache.
+
+The machine tools `get_project_settings({project})` and `set_project_language({project, language, enabled, revision, linter?})` use the same settings as the browser. Use the revision from the read, then take a fresh baseline after changing the language set. Changing a project's languages changes the population being assessed.
 
 ## Export a single-project offline report
 
@@ -89,7 +123,7 @@ node /absolute/path/to/crap-mcp/dist/record.js coverage/lcov.info -- npm run tes
 
 The command and arguments must match configuration exactly. Keep generated reports and build outputs gitignored. Restart the server after changing configuration. MCP requests never run tests. A CI job, file watcher or developer runs the recorder separately.
 
-Supported inputs are LCOV with `DA` records, Istanbul/Jest `coverage-final.json` with statement locations and counters, and Xcode `.xcresult` bundles with detailed archive line counts (macOS with `xcrun xccov`). For Xcode, wrap the project's coverage-enabled `xcodebuild test` command and pass its fresh `-resultBundlePath` as the report. A bundle containing only test-target coverage cannot score a missing library target. Use the original checkout paths, not a report copied from a different machine. Summary percentages alone are insufficient.
+Supported coverage inputs are LCOV with `DA` records, Istanbul/Jest `coverage-final.json` with statement locations and counters, and Xcode `.xcresult` bundles with detailed archive line counts (macOS with `xcrun xccov`). For Xcode, wrap the project's coverage-enabled `xcodebuild test` command and pass its fresh `-resultBundlePath` as the report. A bundle containing only test-target coverage cannot score a missing library target. Use the original checkout paths, not a report copied from a different machine. Summary percentages alone are insufficient.
 
 A passing run must produce a new report and the same source fingerprint before and after. The receipt records the designated suite, run ID, timestamp, source fingerprint and line counts. Inputs include supported source and test files, JS/JSON configuration, lockfiles and Swift package manifests. This is local evidence, not a hermetic build attestation: ignore generated outputs, include meaningful test inputs in version control, and rerun after environment or external-fixture changes. Targeted assertions can verify behavior without updating the comparable score.
 
