@@ -1,5 +1,6 @@
+import { reportHtml } from "../dist/report-html.js";
 import assert from "node:assert/strict";
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -91,10 +92,6 @@ async function diffReport(snapshot) {
   };
 }
 
-function asset(name) {
-  return readFileSync(new URL("../dashboard/" + name, import.meta.url), "utf8");
-}
-
 try {
   await client.connect(
     new StdioClientTransport({
@@ -109,16 +106,7 @@ try {
   const report = await scanReport(),
     review = await diffReport(report.snapshot);
 
-  const data = JSON.stringify({
-    repository: basename(root),
-    ...report,
-    review,
-  }).replaceAll("<", "\\u003c");
-
-  const html = asset("template.html")
-    .replace("/* REPORT_CSS */", () => asset("style.css"))
-    .replace("/* REPORT_JS */", () => asset("../dist/report-view.js"))
-    .replace("REPORT_PAYLOAD", () => data);
+  const html = reportHtml({ repository: basename(root), ...report, review });
 
   mkdirSync(dirname(destination), { recursive: true });
   const temporary = destination + "." + randomUUID();

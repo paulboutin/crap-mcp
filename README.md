@@ -15,7 +15,17 @@ npm run check
 
 The last step runs Oxlint, builds the server, records coverage from passing tests, then launches the compiled server as a child process. An MCP client lists its tools, inspects the scoring function, pages through the backlog, and reviews the diff. Set `CRAP_BASE` to a starting revision to review a longer change. CI uses the push or PR base. The gate rejects skipped source, stale/missing evidence and all CRAP, complexity and nesting hotspots. Single-line callbacks can remain unscored when line counts cannot isolate their execution.
 
-## Open the reporting dashboard
+## Install once for all your projects (macOS)
+
+From one copy of this repository, run `npm run install:machine`. You need Node.js 24.12+, npm, Git, Python 3 and the Codex CLI. The installer builds a private runtime under `~/.local/share/crap-mcp`, starts one per-user launchd service at login, registers its HTTP MCP endpoint in Codex, and links both CRAP skills into `~/.agents/skills`. Rerun the installer from an updated checkout to upgrade. Target projects need no copy of this server, dependencies or Codex config. If a project has an old project-local `crap_score` stdio override, remove that override to use the machine connection.
+
+Open a new Codex chat in a trusted Git checkout and ask **“Use $crap-development-review on this change”** or **“Use $crap-backlog-triage in this project.”** The skill calls `register_project` with the checkout path. Registration returns a stable ID for that path. Every subsequent analysis call supplies that ID, so concurrent chats and linked worktrees keep separate targets. The picker at [the local dashboard](http://127.0.0.1:47731/) lists the registered checkout paths and loads the selected project's current report. Reload to discover newly registered projects. For a task comparison, open `/?project=<id>&snapshot=<starting-snapshot>`.
+
+Structural findings work immediately for TypeScript, TSX and Swift. For numeric CRAP scores, configure each project's coverage command and record its passing suite (below). The installed recorder is at `~/.local/share/crap-mcp/current/dist/record.js`. Registering a project writes its path to the local catalog and saves analysis under its Git directory. The machine service listens only on loopback and is intended for a trusted single-user workstation. Local processes can access registered reports and register checkouts. The browser cannot register a project through the picker.
+
+For other platforms or development, run `npm ci && npm run machine` in one server checkout, then run `codex mcp add crap_score --url http://127.0.0.1:47731/mcp` and install the two skill folders in your user skills directory. The foreground service uses the same catalog and API. `CRAP_PORT` and `CRAP_DATA_DIR` override the foreground defaults.
+
+## Export a single-project offline report
 
 After running the suite, run `npm run dashboard` and open **.crap-local/dashboard.html** in a browser. The file works offline. Search functions by name or path, filter for hotspots or missing evidence, and expand a function for its uncovered lines and findings. The report includes the suite and snapshot, skipped files, and the diff against HEAD. For another checkout, use `npm run dashboard -- /absolute/path/to/repo`; set `CRAP_BASE` to compare with a different revision. Each successful CI run attaches this repo’s HTML report as the **repository-health** artifact. A generated report is a snapshot: rerun the command after code or coverage changes.
 
@@ -33,7 +43,7 @@ Run `npm run prove`. This creates a temporary Git repository, starts the compile
 
 ## Connect an agent
 
-This checkout includes a project-scoped Codex configuration and development-review and backlog-triage skills under [.agents/skills](.agents/skills). Build first, then start your MCP host in the trusted project root. In another repository, configure a stdio server with the absolute path to the **built server** and the **target Git checkout**:
+The machine install above is the usual Codex setup. For a host that only supports stdio, build once and configure the **built server** and **target Git checkout** explicitly:
 
 ```json
 {

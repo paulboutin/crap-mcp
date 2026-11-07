@@ -22,7 +22,9 @@
     "check": "npm run lint && npm run build && npm run coverage && npm run dogfood",
     "prove": "npm run build && node scripts/prove.mjs",
     "dashboard": "npm run build && node scripts/dashboard.mjs",
-    "summary": "npm run build --silent && node scripts/summary.mjs"
+    "summary": "npm run build --silent && node scripts/summary.mjs",
+    "install:machine": "bash scripts/install-machine.sh",
+    "machine": "npm run build && node dist/machine.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
@@ -32,6 +34,7 @@
   },
   "devDependencies": {
     "@oxlint/plugins": "1.92.0",
+    "@types/express": "^5.0.6",
     "@types/jsdom": "27.0.0",
     "@types/node": "24.19.2",
     "jsdom": "27.4.0",

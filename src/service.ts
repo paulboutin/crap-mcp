@@ -111,17 +111,31 @@ const changes = z.object({
 });
 
 export function createServer(repo: Repo) {
-  const desk = new Desk(repo),
-    server = new McpServer({ name: "crap-score-mcp", version: "0.1.0" });
+  const desk = new Desk(repo);
+
+  return analysisServer(() => desk, false);
+}
+
+export function analysisServer(select: (id?: string) => Desk, shared: boolean) {
+  const server = new McpServer({ name: "crap-score-mcp", version: "0.1.0" });
+
+  const id = z
+    .string()
+    .min(1)
+    .describe("Project ID returned by register_project");
+
+  const scope = { project: shared ? id : z.never().optional() };
 
   server.registerTool(
     "analyze_function_health",
     {
       description:
         "Inspect a TypeScript or Swift symbol by repository-relative path and name or line. Returns measured evidence and matching findings.",
-      inputSchema: inspect,
+      inputSchema: inspect.extend(scope),
     },
     async (q) => {
+      const desk = select(q.project);
+
       const s = await desk.current(),
         h = lookup(s.rows, q.file, q.symbol, q.line);
 
@@ -133,9 +147,11 @@ export function createServer(repo: Repo) {
     {
       description:
         "Rank and page findings. Set refresh for background scan progress; use the snapshot id as a task baseline.",
-      inputSchema: query,
+      inputSchema: query.extend(scope),
     },
     async (q) => {
+      const desk = select(q.project);
+
       if (q.refresh) {
         desk.background();
 
@@ -146,7 +162,9 @@ export function createServer(repo: Repo) {
         });
       }
 
-      const baseline = q.view === "integration" ? integrationView(repo) : null;
+      const baseline =
+        q.view === "integration" ? integrationView(desk.repo) : null;
+
       const s = baseline?.scan ?? (await desk.current());
 
       return reply({
@@ -157,7 +175,7 @@ export function createServer(repo: Repo) {
           : null,
         snapshot: meta(s),
         progress: desk.progress,
-        ...backlog(repo, s, q),
+        ...backlog(desk.repo, s, q),
       });
     },
   );
@@ -167,6 +185,7 @@ export function createServer(repo: Repo) {
       description:
         "Page through all assessed functions, including acceptable and unscored ones. Pass the first snapshot ID on subsequent pages for a consistent report.",
       inputSchema: z.object({
+        ...scope,
         ...page,
         snapshot: z
           .string()
@@ -175,6 +194,8 @@ export function createServer(repo: Repo) {
       }),
     },
     async (q) => {
+      const desk = select(q.project);
+
       const s = q.snapshot
         ? desk.base(undefined, q.snapshot)
         : await desk.current();
@@ -193,9 +214,11 @@ export function createServer(repo: Repo) {
     {
       description:
         "Review a session against its starting snapshot or revision. Use format=chat at completion and show the returned session health and raw CRAP changes in your reply.",
-      inputSchema: changes,
+      inputSchema: changes.extend(scope),
     },
     async (q) => {
+      const desk = select(q.project);
+
       const now = await desk.current(),
         base = desk.base(q.base, q.snapshot);
 

@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Projects · CRAP Score</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #f4f6f3;
+        color: #172f36;
+        font:
+          15px/1.5 system-ui,
+          sans-serif;
+        height: 100dvh;
+        display: flex;
+        flex-direction: column;
+      }
+      nav {
+        padding: 12px clamp(16px, 5vw, 64px);
+        background: #fff;
+        border-bottom: 1px solid #d8e0db;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      label {
+        font-weight: 650;
+      }
+      select {
+        border: 1px solid #b9c9c2;
+        border-radius: 5px;
+        background: #fff;
+        color: inherit;
+        font: inherit;
+        padding: 6px 12px;
+        max-width: 75vw;
+      }
+      iframe {
+        border: 0;
+        width: 100%;
+        flex: 1;
+      }
+      p {
+        padding: 12px clamp(16px, 5vw, 64px);
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <label for="project">Project</label
+      ><select id="project" disabled></select>
+    </nav>
+    <p id="status" role="status">Loading projects…</p>
+    <iframe title="Selected project health" hidden></iframe>
+    <script type="module">
+      const select = document.querySelector("select");
+      const frame = document.querySelector("iframe");
+      const status = document.querySelector("#status");
+      const query = new URLSearchParams(location.search);
+      function display() {
+        const id = query.get("project") || select.options[0]?.value;
+        select.value = id ?? "";
+        frame.hidden = !select.value;
+        status.hidden = Boolean(select.value);
+        if (!select.value) {
+          status.textContent = select.options.length
+            ? "This project is unavailable. Choose a registered project."
+            : "Open a Git project in Codex and ask it to use $crap-development-review. Its first scan will appear here.";
+          frame.removeAttribute("src");
+          return;
+        }
+        const report = new URL("/report/" + select.value, location.origin);
+        if (query.has("snapshot"))
+          report.searchParams.set("snapshot", query.get("snapshot"));
+        frame.src = report.href;
+      }
+      try {
+        const response = await fetch("/projects");
+        if (!response.ok) throw Error("Could not load the project list.");
+        const projects = await response.json();
+        for (const { id, root } of projects) {
+          const option = document.createElement("option");
+          option.value = id;
+          option.textContent = root;
+          select.append(option);
+        }
+        select.disabled = !projects.length;
+        select.onchange = () => {
+          location.search = new URLSearchParams({ project: select.value });
+        };
+        display();
+      } catch (error) {
+        status.textContent = String(error);
+      }
+    </script>
+  </body>
+</html>
