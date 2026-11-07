@@ -19,7 +19,9 @@
     "test": "node --test test/*.test.ts",
     "coverage": "node src/record.ts coverage/lcov.info -- node scripts/unit-coverage.mjs",
     "dogfood": "node scripts/dogfood.mjs",
-    "check": "npm run lint && npm run build && npm run coverage && npm run dogfood"
+    "check": "npm run lint && npm run build && npm run coverage && npm run dogfood",
+    "prove": "npm run build && node scripts/prove.mjs",
+    "dashboard": "npm run build && node scripts/dashboard.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
@@ -29,7 +31,9 @@
   },
   "devDependencies": {
     "@oxlint/plugins": "1.92.0",
+    "@types/jsdom": "27.0.0",
     "@types/node": "24.19.2",
+    "jsdom": "27.4.0",
     "oxlint": "1.92.0",
     "prettier": "3.9.10",
     "typescript": "6.0.3"

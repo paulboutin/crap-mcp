@@ -39,7 +39,9 @@ try {
     }),
   );
   const inventory = await client.listTools();
-  assert.equal(inventory.tools.length, 3);
+  assert.ok(
+    inventory.tools.some((tool) => tool.name === "get_repository_report"),
+  );
   const started = performance.now();
 
   const inspection = await call("analyze_function_health", {

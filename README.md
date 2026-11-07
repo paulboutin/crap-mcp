@@ -15,6 +15,14 @@ npm run check
 
 The last step runs Oxlint, builds the server, records coverage from passing tests, then launches the compiled server as a child process. An MCP client lists its tools, inspects the scoring function, pages through the backlog, and reviews the diff. Set `CRAP_BASE` to a starting revision to review a longer change. CI uses the push or PR base. The gate rejects skipped source, stale/missing evidence and all CRAP, complexity and nesting hotspots. Single-line callbacks can remain unscored when line counts cannot isolate their execution.
 
+## Open the reporting dashboard
+
+After running the suite, run `npm run dashboard` and open **.crap-local/dashboard.html** in a browser. The file works offline. Search functions by name or path, filter for hotspots or missing evidence, and expand a function for its uncovered lines and findings. The report includes the suite and snapshot, skipped files, and the diff against HEAD. For another checkout, use `npm run dashboard -- /absolute/path/to/repo`; set `CRAP_BASE` to compare with a different revision. Each successful CI run attaches this repo’s HTML report as the **repository-health** artifact. A generated report is a snapshot: rerun the command after code or coverage changes.
+
+## Reproduce the end-to-end proof
+
+Run `npm run prove`. This creates a temporary Git repository, starts the compiled server over stdio, and runs actual Node tests. It compares each measured score with an independent calculation from the raw LCOV line counts. The first test exercises one HTTP status. Expanding the suite covers ten statuses and a fallback without changing the function. A deliberately wrong 401 result must fail the suite, and the server must continue withholding a score. Finally a table lookup must pass the same assertions and resolve both original findings. CI runs this experiment on every change.
+
 ## Connect an agent
 
 This checkout includes a project-scoped Codex configuration and development-review and backlog-triage skills under [.agents/skills](.agents/skills). Build first, then start your MCP host in the trusted project root. In another repository, configure a stdio server with the absolute path to the **built server** and the **target Git checkout**:
@@ -36,6 +44,7 @@ For Codex use the equivalent `[mcp_servers.crap_score]` table in the target's `.
 | --- | --- | --- |
 | `analyze_function_health` | `{"file":"src/coverage.ts","symbol":"score"}` | Qualified symbol and line range, complexity, nesting, measured/uncovered lines, score, findings and checks. Use a one-based `line` instead of a name to select the innermost function. |
 | `scan_repository_hotspots` | `{"rule":"crap","priority":"churn","limit":10}` | Ranked items, scan progress, skips, snapshot and pagination. Filter by path prefix, rule or coverage (including `unscored`). Order by score, critical paths or file commits over 90 days. |
+| `get_repository_report` | `{"limit":100}` | All assessed functions, including acceptable and unscored ones. Pass the first snapshot ID on subsequent pages. The reporting dashboard uses this tool. |
 | `review_changes` | `{"snapshot":"<starting snapshot id>","findingId":"<optional selected id>"}` | New, worsened, resolved, unknown, improved and pre-existing findings for affected symbols, with before/after evidence. Use `base` for a Git revision instead of a saved snapshot. |
 
 Capture a worktree snapshot before editing if uncommitted changes exist. A review compares the final working source (including nonignored, untracked files) against that starting state. An unchanged selected finding can also be followed through a test-only edit. Pages use zero-based `offset` and `limit` (1–100); follow each collection's `nextOffset`. A scan starts at launch, rechecks inputs on query, and accepts `{"refresh":true}` for a background refresh. Findings include the rule, evidence, suggested action and completion check.

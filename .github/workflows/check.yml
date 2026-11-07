@@ -25,3 +25,13 @@ jobs:
             base=$(git rev-list --max-parents=0 HEAD | head -1)
           fi
           CRAP_BASE="$base" npm run check
+          node scripts/prove.mjs
+          CRAP_BASE="$base" node scripts/dashboard.mjs
+      - name: Save the self-review dashboard
+        uses: actions/upload-artifact@v4
+        with:
+          name: repository-health
+          path: .crap-local/dashboard.html
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14

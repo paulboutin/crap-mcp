@@ -340,3 +340,62 @@ test("review orders introduced, worsened and resolved findings; a broken integra
   assert.equal(previous.snapshot.id, baseline.snapshot.id);
   assert.equal(previous.total, 2);
 });
+
+test("reports keep acceptable and unscored functions, and additional pages stay on the requested snapshot", async (t) => {
+  const path = fixture(t);
+  writeFileSync(
+    join(path, "a.ts"),
+    "function first() { return 1; }\nfunction second() { return 2; }",
+  );
+  writeFileSync(join(path, "b.ts"), "function untested() { return false; }");
+  commit(path);
+  recordRun(path);
+  const c = await connect(t, path);
+  const page = await call(c, "get_repository_report", { limit: 1 });
+  assert.equal(page.total, 3);
+  assert.equal(page.items[0].score, 2);
+  assert.deepEqual(page.items[0].findings, []);
+  writeFileSync(join(path, "a.ts"), "function first() { return 42; }");
+
+  const next = await call(c, "get_repository_report", {
+    snapshot: page.snapshot.id,
+    offset: 1,
+  });
+
+  assert.equal(next.items[0].symbol, "second");
+  assert.equal(next.items[1].coverage.status, "missing");
+  assert.equal(next.snapshot.id, page.snapshot.id);
+  const fresh = await call(c, "get_repository_report", {});
+  assert.equal(fresh.total, 2);
+  assert.notEqual(fresh.snapshot.id, page.snapshot.id);
+});
+
+test("an uncached Git baseline uses committed bytes and reports historical symlinks as unassessed", async (t) => {
+  const path = fixture(t);
+  writeFileSync(join(path, "a.ts"), source);
+  symlinkSync("a.ts", join(path, "alias.ts"));
+  const ref = commit(path);
+  writeFileSync(
+    join(path, "a.ts"),
+    "export function work(x: number) { return x; }",
+  );
+  rmSync(join(path, "alias.ts"));
+  writeFileSync(
+    join(path, "alias.ts"),
+    "export function formerlyLinked() { return 1; }",
+  );
+  const c = await connect(t, path);
+  const result = await call(c, "review_changes", { base: ref });
+  assert.equal(result.baseline.commit, ref);
+  assert.deepEqual(result.unassessed, ["alias.ts"]);
+  assert.equal(result.affected.total, 1);
+  assert.equal(result.affected.items[0].before.complexity, 10);
+  assert.equal(result.affected.items[0].before.score, null);
+  assert.equal(result.affected.items[0].after.complexity, 1);
+  assert.equal(
+    result.findings.items.find((f: { findingId: string }) =>
+      f.findingId.endsWith(":complexity"),
+    ).status,
+    "resolved",
+  );
+});

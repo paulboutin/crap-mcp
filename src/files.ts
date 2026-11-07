@@ -40,6 +40,8 @@ export function maybeRevision(root: string, ref: string) {
   }
 }
 
+export const maxSourceBytes = 16 * 1024 * 1024;
+
 export function safeFile(root: string, file: string) {
   const full = resolve(root, file),
     local = relative(root, full);
@@ -56,7 +58,7 @@ export function safeFile(root: string, file: string) {
     );
   const stat = statSync(full);
 
-  if (!stat.isFile() || stat.size > 16 * 1024 * 1024)
+  if (!stat.isFile() || stat.size > maxSourceBytes)
     throw Error("Not a regular source file below 16 MiB: " + file);
 
   return full;

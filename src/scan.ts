@@ -4,6 +4,7 @@ import { setImmediate as yieldTurn } from "node:timers/promises";
 import { z } from "zod";
 import {
   digest,
+  maxSourceBytes,
   policy,
   checkConfig,
   eligible,
@@ -216,18 +217,19 @@ export function historical(repo: Repo, commit: string) {
   const s = start(commit, repo, commit),
     cache = new Map<string, Routine[]>();
 
-  for (const file of nul(
-    git(repo.root, "ls-tree", "-r", "--name-only", "-z", commit),
+  for (const entry of nul(
+    git(repo.root, "ls-tree", "-r", "-l", "-z", commit),
   )) {
+    const tab = entry.indexOf("\t"),
+      file = entry.slice(tab + 1);
+
     if (!eligible(repo, file)) continue;
+    const [mode, , oid, size] = entry.slice(0, tab).trim().split(/\s+/);
 
     try {
-      inspect(
-        s,
-        file,
-        git(repo.root, "cat-file", "blob", commit + ":" + file),
-        cache,
-      );
+      if (!["100644", "100755"].includes(mode) || Number(size) > maxSourceBytes)
+        throw Error("Not a regular source blob within the 16 MiB limit");
+      inspect(s, file, git(repo.root, "cat-file", "blob", oid), cache);
     } catch (error) {
       skip(s, file, String(error));
     }

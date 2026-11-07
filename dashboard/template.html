@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
+    />
+    <meta name="color-scheme" content="light" />
+    <title>Repository health · CRAP Score</title>
+    <style>
+      /* REPORT_CSS */
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap bar">
+        <div class="brand">
+          <span class="mark" aria-hidden="true">▥</span> CRAP Score
+          <span class="divider"></span
+          ><span class="muted-light">Reporting</span>
+        </div>
+        <span class="badge">Local snapshot</span>
+      </div>
+    </header>
+    <main class="wrap">
+      <div class="intro">
+        <div>
+          <small class="eyebrow" id="repo"></small>
+          <h1>Repository health</h1>
+          <p class="sub" id="meta"></p>
+        </div>
+        <div id="scan-status" class="pill"></div>
+      </div>
+      <div class="cards" aria-label="Repository metrics">
+        <article>
+          <span>Functions assessed</span><strong id="assessed"></strong
+          ><small id="filecount"></small>
+        </article>
+        <article>
+          <span>Risk hotspots</span><strong id="hot"></strong
+          ><small>Measured CRAP above 30</small>
+        </article>
+        <article>
+          <span>Unscored functions</span><strong id="unscored"></strong
+          ><small>Missing or insufficient evidence</small>
+        </article>
+        <article>
+          <span>Changed functions</span><strong id="changed"></strong
+          ><small id="comparison"></small>
+        </article>
+      </div>
+      <section class="strip">
+        <div><b>Score coverage</b><span id="fraction"></span></div>
+        <progress
+          id="meter"
+          aria-label="Functions with measured scores"
+        ></progress>
+      </section>
+      <section class="panel">
+        <div class="section-head">
+          <div>
+            <small class="eyebrow">CODE INVENTORY</small>
+            <h2>Function explorer</h2>
+          </div>
+          <span id="match" aria-live="polite"></span>
+        </div>
+        <div class="controls">
+          <label
+            >Search<input
+              type="search"
+              id="search"
+              placeholder="Function or file path" /></label
+          ><label
+            >Show<select id="filter">
+              <option value="all">All functions</option>
+              <option value="risk">Risk hotspots</option>
+              <option value="structure">Structural findings</option>
+              <option value="unscored">Unscored functions</option>
+            </select></label
+          >
+        </div>
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Function / source</th>
+                <th>Complexity</th>
+                <th>Coverage</th>
+                <th>CRAP</th>
+                <th>Risk</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <p id="empty" hidden>No functions match this view.</p>
+        <div class="pager">
+          <button id="previous">Previous</button><span id="range"></span
+          ><button id="next">Next</button>
+        </div>
+      </section>
+      <div class="footgrid">
+        <section class="panel">
+          <small class="eyebrow">PATCH REVIEW</small>
+          <h2>Changes since baseline</h2>
+          <p id="diffmeta"></p>
+          <div id="deltas"></div>
+        </section>
+        <section class="panel">
+          <small class="eyebrow">SCAN EVIDENCE</small>
+          <h2>Coverage and scope</h2>
+          <dl id="facts"></dl>
+          <details>
+            <summary id="skipcount"></summary>
+            <ul id="skips"></ul>
+          </details>
+        </section>
+      </div>
+      <footer>
+        CRAP Score MCP
+        <span>Generated report · Rebuild with npm run dashboard</span>
+      </footer>
+    </main>
+    <script type="application/json" id="data">
+      REPORT_PAYLOAD
+    </script>
+    <script type="module">
+      /* REPORT_JS */
+      renderReport(
+        document,
+        JSON.parse(document.getElementById("data").textContent),
+      );
+    </script>
+  </body>
+</html>

@@ -160,6 +160,33 @@ export function createServer(repo: Repo) {
     },
   );
   server.registerTool(
+    "get_repository_report",
+    {
+      description:
+        "Page through all assessed functions, including acceptable and unscored ones. Pass the first snapshot ID on subsequent pages for a consistent report.",
+      inputSchema: z.object({
+        ...page,
+        snapshot: z
+          .string()
+          .regex(/^[a-f0-9]{64}$/)
+          .optional(),
+      }),
+    },
+    async (q) => {
+      const s = q.snapshot
+        ? desk.base(undefined, q.snapshot)
+        : await desk.current();
+
+      const section = slice(s.rows, q.offset, q.limit);
+
+      return reply({
+        snapshot: meta(s),
+        ...section,
+        items: section.items.map((h) => ({ ...h, findings: findings(h) })),
+      });
+    },
+  );
+  server.registerTool(
     "review_changes",
     {
       description:
