@@ -2,6 +2,8 @@
 
 Find functions that combine complex control flow with thin test coverage. One local HTTP service handles multiple checkouts. It scans TypeScript, TSX and Swift out of the box, supports optional language packs, keeps a backlog across Git worktrees, and reviews what changed during a task. No account, API key or hosted service is needed for analysis.
 
+Original code and documentation are available under the [MIT license](LICENSE). See the [contributing guide](CONTRIBUTING.md) for local setup and pull requests, and [third-party notices](THIRD_PARTY_NOTICES.md) for vendored components and language packs.
+
 ## Try it on this repository
 
 Requires Git and Node.js 24.12+ (CI runs Node 24). From the clone root:

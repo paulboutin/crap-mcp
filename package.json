@@ -2,6 +2,7 @@
   "name": "crap-score-mcp",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "Local function risk, coverage evidence and change review for TypeScript and Swift",
   "type": "module",
   "engines": {

@@ -26,7 +26,7 @@ bash scripts/connect-clients.sh --check
 npm run build
 release=$(mktemp -d "$data/releases/build.XXXXXXXX")
 mkdir -p "$release/.agents"
-cp -R dist dashboard languages .oxlintrc.json package.json package-lock.json "$release/"
+cp -R LICENSE THIRD_PARTY_NOTICES.md dist dashboard languages .oxlintrc.json package.json package-lock.json "$release/"
 mkdir -p "$release/tools/oxlint" "$release/scripts"
 cp -R tools/oxlint/anti-slop "$release/tools/oxlint/"
 cp scripts/ensure-service.sh scripts/connect-clients.sh scripts/opencode-config.mjs "$release/scripts/"
