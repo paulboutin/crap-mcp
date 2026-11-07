@@ -99,6 +99,10 @@ test("offline dashboard distinguishes risk from unscored, pages and filters, and
     prev = doc.querySelector<HTMLButtonElement>("#previous")!;
 
   assert.equal(doc.querySelectorAll("tbody tr").length, 10);
+  const cells = doc.querySelectorAll("tbody tr:first-child td");
+  assert.equal(cells[1].textContent, "11 / 10");
+  assert.equal(cells[3].textContent, "132.00 / 30");
+  assert.equal(cells[4].textContent, "Critical");
   next.click();
   assert.equal(text("range"), "11–12 of 12");
   prev.click();
@@ -115,6 +119,7 @@ test("offline dashboard distinguishes risk from unscored, pages and filters, and
   }
 
   const search = doc.querySelector("input")!;
+  assert.equal(doc.querySelector("tbody tr td:nth-child(4)")?.textContent, "—");
   search.value = "absent";
   search.dispatchEvent(new window.Event("input"));
   assert.equal(text("range"), "0 results");

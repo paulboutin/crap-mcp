@@ -34,7 +34,7 @@
         <div id="scan-status" class="pill"></div>
       </div>
       <section class="panel session" aria-label="Session health">
-        <small class="eyebrow">SESSION REVIEW</small>
+        <small class="eyebrow">SESSION GRADE · HIGHER IS BETTER</small>
         <h2 id="session-score"></h2>
         <p id="score-scope"></p>
         <p id="raw-scores"></p>
@@ -85,6 +85,12 @@
           </div>
           <span id="match" aria-live="polite"></span>
         </div>
+        <p id="risk-scale">
+          Lower is better for both measures. The number after the slash is the
+          review threshold. Both measures can exceed it and have no fixed
+          maximum. Complexity starts at 1 and triggers review at 10. CRAP is
+          high above 30 and critical above 60.
+        </p>
         <div class="controls">
           <label
             >Search<input
@@ -101,14 +107,14 @@
           >
         </div>
         <div class="tablewrap">
-          <table>
+          <table aria-describedby="risk-scale">
             <thead>
               <tr>
                 <th>Function / source</th>
-                <th>Complexity</th>
+                <th>Complexity / review at</th>
                 <th>Coverage</th>
-                <th>CRAP</th>
-                <th>Risk</th>
+                <th>CRAP / high above</th>
+                <th>CRAP band</th>
               </tr>
             </thead>
             <tbody id="rows"></tbody>

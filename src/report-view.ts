@@ -209,14 +209,21 @@ function row(doc: Document, h: Row) {
       ? h.coverage.status
       : h.coverage.percent.toFixed(0) + "%";
 
-  const tag = element(doc, "span", h.risk ?? "unscored");
+  const bands = {
+    acceptable: "Within threshold",
+    high: "High",
+    critical: "Critical",
+    unknown: "Unscored",
+  };
+
+  const tag = element(doc, "span", bands[h.risk ?? "unknown"]);
   tag.className = "tag " + (h.risk ?? "unknown");
   risk.append(tag);
   tr.append(
     name,
-    element(doc, "td", String(h.complexity)),
+    element(doc, "td", h.complexity + " / 10"),
     element(doc, "td", coverage),
-    element(doc, "td", h.score?.toFixed(2) ?? "—"),
+    element(doc, "td", h.score === null ? "—" : h.score.toFixed(2) + " / 30"),
     risk,
   );
 
@@ -305,7 +312,7 @@ function scorePanel(doc: Document, r: Report) {
       median.toFixed(2) +
       " · highest " +
       values[values.length - 1].toFixed(2) +
-      " · lower is better"
+      " · high above 30 · lower is better"
     : "No measured repository CRAP scores.";
 
   for (const line of summary?.examples ?? [])

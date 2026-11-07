@@ -127,7 +127,9 @@ export function sessionSummary(result: Review) {
         result.unassessed.length +
         " files unassessed.",
       "Finding changes: " + changes + ".",
-      ...examples.map((line) => "CRAP (lower is better) · " + line),
+      ...examples.map(
+        (line) => "CRAP (lower is better, high above 30) · " + line,
+      ),
     ].join("\n"),
   };
 }
