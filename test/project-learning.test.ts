@@ -1,5 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { z } from "zod";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, readFileSync, writeFileSync } from "node:fs";
@@ -87,10 +88,33 @@ test("replay failures and benchmark regressions survive sharing and a fresh clon
 
   const chat = await client.callTool({
     name: "review_changes",
-    arguments: { snapshot: before.metrics!.snapshot, format: "chat" },
+    arguments: {
+      snapshot: before.metrics!.snapshot,
+      format: "chat",
+      scorecard: true,
+    },
   });
 
   assert.match(JSON.stringify(chat.content), /Replay · qa: passed → failed/);
+
+  const card = z
+    .object({
+      type: z.literal("image"),
+      mimeType: z.literal("image/png"),
+      data: z.string(),
+    })
+    .parse(chat.content[1]);
+
+  const image = Buffer.from(card.data, "base64");
+  assert.equal(image.readUInt32BE(16), 1020);
+
+  const path = z
+    .object({ text: z.string() })
+    .parse(chat.content[0])
+    .text.split("Scorecard: ")
+    .at(-1)!;
+
+  assert.deepEqual(readFileSync(path), image);
   await client.close();
   const evidence = compareChecks(after, before).join("\n");
   assert.match(evidence, /Replay · qa: passed → failed/);

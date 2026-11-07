@@ -7,27 +7,14 @@ if [[ $(uname -s) != Darwin ]]; then
   exit 1
 fi
 node_bin=$(command -v node)
-codex_bin=$(command -v codex)
 data="$HOME/.local/share/crap-mcp"
-skills="$HOME/.agents/skills"
 label=com.crap-score.machine
 domain="gui/$(id -u)"
 plist="$HOME/Library/LaunchAgents/$label.plist"
 url=http://127.0.0.1:47731
 umask 077
-mkdir -p "$data/releases" "$skills" "$(dirname "$plist")"
+mkdir -p "$data/releases" "$(dirname "$plist")"
 
-# Check user-owned skill names and MCP configuration before replacing anything.
-for source in "$repo"/.agents/skills/crap-*; do
-  dest="$skills/${source##*/}"
-  if [[ -e "$dest" || -L "$dest" ]]; then
-    [[ $(readlink "$dest" || true) == "$data/current/.agents/skills/${source##*/}" ]] || { echo "Existing skill at $dest" >&2; exit 1; }
-  fi
-done
-cd "$HOME"
-if config=$("$codex_bin" mcp get crap_score --json 2>/dev/null); then
-  node -e 'const c=JSON.parse(process.argv[1]);if(c.transport.url!==process.argv[2]) throw Error("Existing crap_score connection uses another server")' "$config" "$url/mcp"
-fi
 if ! launchctl print "$domain/$label" >/dev/null 2>&1 && nc -z 127.0.0.1 47731; then
   echo 'Port 47731 is already in use.' >&2
   exit 1
@@ -35,13 +22,14 @@ fi
 
 cd "$repo"
 npm ci --no-audit --no-fund
+bash scripts/connect-clients.sh --check
 npm run build
 release=$(mktemp -d "$data/releases/build.XXXXXXXX")
 mkdir -p "$release/.agents"
 cp -R dist dashboard languages .oxlintrc.json package.json package-lock.json "$release/"
 mkdir -p "$release/tools/oxlint" "$release/scripts"
 cp -R tools/oxlint/anti-slop "$release/tools/oxlint/"
-cp scripts/ensure-service.sh "$release/scripts/"
+cp scripts/ensure-service.sh scripts/connect-clients.sh scripts/opencode-config.mjs "$release/scripts/"
 cp -R .agents/skills "$release/.agents/"
 (cd "$release" && npm ci --omit=dev --no-audit --no-fund)
 previous=$(readlink "$data/current" || true)
@@ -67,10 +55,5 @@ if ! bash "$release/scripts/ensure-service.sh" --restart; then
   echo "Service did not start. See $data/service.log" >&2
   exit 1
 fi
-for source in "$release"/.agents/skills/crap-*; do
-  dest="$skills/${source##*/}"
-  if [[ ! -L "$dest" ]]; then ln -s "$data/current/.agents/skills/${source##*/}" "$dest"; fi
-done
-cd "$HOME"
-"$codex_bin" mcp add crap_score --url "$url/mcp"
+bash "$release/scripts/connect-clients.sh"
 echo "Local dashboard: $url/"

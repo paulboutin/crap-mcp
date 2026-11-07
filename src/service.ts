@@ -12,6 +12,7 @@ import {
   scan,
   type Snapshot,
 } from "./scan.ts";
+import { scorecard } from "./scorecard.ts";
 import { compareChecks } from "./check-comparison.ts";
 import { recentRuns } from "./check-history.ts";
 import { sessionSummary } from "./session.ts";
@@ -91,14 +92,53 @@ function meta(s: Snapshot) {
   return { ...details, functions: rows.length };
 }
 
-function sessionChecks(repo: Repo, base: Snapshot, now: Snapshot) {
+function matchingCheck(
+  repo: Repo,
+  snapshot: Snapshot,
+  runs: ReturnType<typeof recentRuns>,
+) {
+  const candidate = runs.find((r) => r.run !== null && r.run === snapshot.run);
+
+  if (!candidate?.metrics) return undefined;
+
+  if (candidate.metrics.snapshot === snapshot.id) return candidate;
+  // A commit changes the snapshot ID even when the tested inputs are identical.
+  const recorded = saved(repo, candidate.metrics.snapshot);
+
+  return recorded?.input === snapshot.input ? candidate : undefined;
+}
+
+async function chatReview(
+  repo: Repo,
+  base: Snapshot,
+  now: Snapshot,
+  summary: ReturnType<typeof sessionSummary>,
+  showCard: boolean,
+) {
   const runs = recentRuns(repo);
-  const latest = runs.find((r) => r.metrics?.snapshot === now.id);
+  const latest = matchingCheck(repo, now, runs);
 
-  if (!latest?.trials?.length) return "";
-  const baseline = runs.find((r) => r.metrics?.snapshot === base.id);
+  const lines = [
+    summary.chat,
+    "Suite: " +
+      now.suite +
+      " · run " +
+      (now.run ?? "none") +
+      " · baseline " +
+      base.id.slice(0, 12) +
+      " → " +
+      now.id.slice(0, 12),
+  ];
 
-  return "\n" + compareChecks(latest, baseline).join("\n");
+  if (latest?.trials?.length)
+    lines.push(...compareChecks(latest, matchingCheck(repo, base, runs)));
+  const result = { type: "text" as const, text: lines.join("\n") };
+
+  if (!showCard) return { content: [result] };
+  const card = await scorecard(repo.local, base.id, now.id, summary, latest);
+  result.text += "\nScorecard: " + card.path;
+
+  return { content: [result, card.image] };
 }
 
 function reply<T>(value: T) {
@@ -112,6 +152,12 @@ const inspect = z.object({
 });
 
 const changes = z.object({
+  scorecard: z
+    .boolean()
+    .default(false)
+    .describe(
+      "With chat format, include a PNG image and its absolute file path.",
+    ),
   format: z.enum(["data", "chat"]).default("data"),
   ...page,
   base: z.string().min(1).optional(),
@@ -240,24 +286,7 @@ export function analysisServer(select: (id?: string) => Desk, shared: boolean) {
       const summary = sessionSummary(q.findingId ? review(base, now) : result);
 
       if (q.format === "chat")
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text:
-                summary.chat +
-                "\nSuite: " +
-                now.suite +
-                " · run " +
-                (now.run ?? "none") +
-                " · baseline " +
-                base.id.slice(0, 12) +
-                " → " +
-                now.id.slice(0, 12) +
-                sessionChecks(desk.repo, base, now),
-            },
-          ],
-        };
+        return chatReview(desk.repo, base, now, summary, q.scorecard);
 
       return reply({
         summary,
