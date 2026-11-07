@@ -38,6 +38,33 @@
         font: inherit;
         padding: 6px 12px;
         max-width: min(60vw, 70ch);
+        min-width: 0;
+      }
+      .icon-link:not([hidden]) {
+        display: inline-grid;
+        place-items: center;
+        flex: 0 0 44px;
+        height: 44px;
+        border-radius: 6px;
+        color: #135a50;
+        text-decoration: none;
+      }
+      .icon-link:hover,
+      .icon-link:focus-visible {
+        background: #e8efeb;
+      }
+      #settings {
+        margin-inline-start: auto;
+        font-size: 24px;
+        line-height: 1;
+      }
+      #back::before {
+        content: "";
+        width: 10px;
+        height: 10px;
+        border: solid currentColor;
+        border-width: 0 0 2px 2px;
+        transform: rotate(45deg);
       }
       iframe {
         border: 0;
@@ -51,9 +78,23 @@
   </head>
   <body>
     <nav>
+      <a
+        id="back"
+        class="icon-link"
+        aria-label="Back to project report"
+        title="Back to project report"
+        hidden
+      ></a>
       <label for="project">Project</label
       ><select id="project" disabled></select>
-      <a id="view" hidden></a>
+      <a
+        id="settings"
+        class="icon-link"
+        aria-label="Project settings"
+        title="Project settings"
+        hidden
+        ><span aria-hidden="true">⚙︎</span></a
+      >
     </nav>
     <p id="status" role="status">Loading projects…</p>
     <iframe title="Selected project health" hidden></iframe>
@@ -78,13 +119,13 @@
         if (query.has("snapshot"))
           report.searchParams.set("snapshot", query.get("snapshot"));
         const settings = query.get("view") === "settings";
-        const link = document.querySelector("#view");
+        const link = document.querySelector(settings ? "#back" : "#settings");
         const next = new URL(location.href);
         next.searchParams.set("project", id);
-        next.searchParams.set("view", settings ? "report" : "settings");
+        if (settings) next.searchParams.delete("view");
+        else next.searchParams.set("view", "settings");
         link.href = next;
         link.hidden = false;
-        link.textContent = settings ? "Project report" : "Project settings";
         frame.title = settings ? "Project settings" : "Selected project health";
         frame.src = settings
           ? "/settings?project=" + encodeURIComponent(id)
@@ -104,6 +145,7 @@
         select.onchange = () => {
           query.set("project", select.value);
           query.delete("snapshot");
+          query.delete("view");
           location.search = query;
         };
         display();

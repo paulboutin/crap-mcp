@@ -127,6 +127,17 @@
           <details>
             <summary>Install a custom language pack</summary>
             <p>
+              <a
+                href="https://cdn.jsdelivr.net/npm/@repomix/tree-sitter-wasms@0.1.17/out/"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Browse Tree-sitter WASM downloads</a
+              >. Copy the language file’s URL into the manifest’s
+              <code>wasm</code>
+              field and include its byte length and SHA-256. The manifest also
+              defines which syntax counts toward the project’s scores.
+            </p>
+            <p>
               Place the trusted JSON manifest in
               <code>~/.local/share/crap-mcp/languages/</code>. For a local
               grammar, also copy the WASM file to the path named in the
