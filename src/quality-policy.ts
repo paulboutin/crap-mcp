@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import {
+  teamFile,
+  teamPath,
   directories,
   digest,
   readJson,
@@ -62,16 +64,72 @@ const change = z.object({
   removed: z.array(z.string()),
   maxCrap: z.number(),
   minCoverage: z.number(),
+  reason: z.string().optional(),
 });
 
-const stored = z.object({ settings: targets, changes: z.array(change) });
+const text = z.string().trim().min(1).max(2000);
+
+export const observation = z.object({
+  before: z.string(),
+  after: z.string(),
+  finding: text,
+  conclusion: text,
+  nextRule: text,
+});
+
+const lesson = observation.extend({
+  evidence: z.array(z.string()),
+  beforeSnapshot: z.string().nullable().optional(),
+  afterSnapshot: z.string().nullable().optional(),
+  beforeCommit: z.string().nullable(),
+  afterCommit: z.string().nullable(),
+});
+
+const captured = z.object({
+  snapshot: z.string(),
+  at: z.string(),
+  complete: z.boolean(),
+  findings: z.array(
+    z.object({
+      id: z.string(),
+      file: z.string(),
+      symbol: z.string(),
+      reason: z.string(),
+    }),
+  ),
+});
+
+const stored = z.object({
+  settings: targets,
+  changes: z.array(change),
+  lessons: z.array(lesson).default([]),
+  capture: captured.nullable().default(null),
+});
+
+type State = z.infer<typeof stored>;
+
+const manifest = stored.extend({ version: z.literal(1) }).strict();
+
+function saveState(repo: Repo, state: State, shared: boolean) {
+  const parsed = stored.parse(state);
+
+  if (shared)
+    writeJson(join(repo.root, teamFile), { version: 1, ...parsed }, true);
+  else writeJson(join(repo.local, "quality-policy.json"), parsed);
+}
 
 export const edit = z
-  .object({ revision: z.string(), settings: targets })
+  .object({ revision: z.string(), settings: targets, reason: text.optional() })
   .strict();
 
 export function qualityPolicy(repo: Repo) {
-  const state = readJson(join(repo.local, "quality-policy.json"), stored) ?? {
+  const path = teamPath(repo.root);
+
+  const state = (path
+    ? readJson(path, manifest)
+    : readJson(join(repo.local, "quality-policy.json"), stored)) ?? {
+    lessons: [],
+    capture: null,
     settings: {
       maxCrap: 30,
       minCoverage: 0,
@@ -85,6 +143,7 @@ export function qualityPolicy(repo: Repo) {
 
   return {
     ...state,
+    shared: Boolean(path),
     revision: digest(JSON.stringify(state)),
     catalog,
     analysisExclusions: repo.config.exclude,
@@ -114,6 +173,7 @@ export function updatePolicy(repo: Repo, input: z.infer<typeof edit>) {
   const removed = before.filter((name) => !after.includes(name));
 
   const entry = {
+    reason: input.reason,
     at: new Date().toISOString(),
     added,
     removed,
@@ -121,10 +181,15 @@ export function updatePolicy(repo: Repo, input: z.infer<typeof edit>) {
     minCoverage: settings.minCoverage,
   };
 
-  writeJson(join(repo.local, "quality-policy.json"), {
-    settings,
-    changes: [entry, ...current.changes],
-  });
+  saveState(
+    repo,
+    {
+      ...current,
+      settings,
+      changes: [entry, ...current.changes],
+    },
+    current.shared,
+  );
 
   return qualityPolicy(repo);
 }
@@ -179,4 +244,40 @@ export function setLanguage(repo: Repo, q: z.infer<typeof languageChange>) {
     settings.linters = toggle(settings.linters, pack.id, q.linter === true);
 
   return applyPolicy(repo, { revision: q.revision, settings });
+}
+
+export function saveCapture(
+  repo: Repo,
+  revision: string,
+  capture: State["capture"],
+) {
+  const state = qualityPolicy(repo);
+
+  if (state.revision !== revision)
+    throw Error("Settings changed. Reload before sharing.");
+  saveState(repo, { ...state, capture }, true);
+
+  return qualityPolicy(repo).revision;
+}
+
+export function saveLesson(
+  repo: Repo,
+  revision: string,
+  input: z.infer<typeof lesson>,
+) {
+  const state = qualityPolicy(repo);
+
+  if (state.revision !== revision)
+    throw Error("Settings changed. Reload before recording.");
+
+  const lessons = state.lessons.filter(
+    (item) =>
+      !(
+        item.before === input.before &&
+        item.after === input.after &&
+        item.finding === input.finding
+      ),
+  );
+
+  saveState(repo, { ...state, lessons: [input, ...lessons] }, state.shared);
 }

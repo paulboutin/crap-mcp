@@ -10,6 +10,7 @@ import {
   workFiles,
   isMissing,
   supported,
+  teamFile,
 } from "./files.ts";
 import { counts, type Counts } from "./importers.ts";
 import type { Routine } from "./syntax.ts";
@@ -36,6 +37,8 @@ export function fingerprint(repo: Repo) {
   ];
 
   for (const file of workFiles(repo)) {
+    if (file === teamFile) continue; // Shareable evidence is a result, not suite input.
+
     if (
       !supported(file, repo.packs) &&
       !/(?:^|\/)(?:\.crap\.json|[^/]*lock[^/]*|Package\.swift|pyproject\.toml|Cargo\.toml|go\.(?:mod|sum)|requirements[^/]*\.txt|[^/]*\.(?:js|jsx|mjs|cjs|json))$/.test(

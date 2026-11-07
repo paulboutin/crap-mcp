@@ -12,5 +12,26 @@
   "command": [
     "node",
     "scripts/unit-coverage.mjs"
+  ],
+  "experiments": [
+    {
+      "name": "Replay 48 TypeScript functions",
+      "kind": "qa",
+      "version": "1",
+      "command": [
+        "node",
+        "scripts/replay-parser.mjs"
+      ]
+    },
+    {
+      "name": "Parse the fixture ten times",
+      "kind": "benchmark",
+      "version": "1",
+      "command": [
+        "node",
+        "scripts/replay-parser.mjs",
+        "--benchmark"
+      ]
+    }
   ]
 }

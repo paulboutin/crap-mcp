@@ -1,3 +1,5 @@
+import { projectEvidence } from "../dist/project-learning.js";
+import { repository } from "../dist/files.js";
 import { reportHtml } from "../dist/report-html.js";
 import assert from "node:assert/strict";
 import { mkdirSync, renameSync, writeFileSync } from "node:fs";
@@ -106,7 +108,12 @@ try {
   const report = await scanReport(),
     review = await diffReport(report.snapshot);
 
-  const html = reportHtml({ repository: basename(root), ...report, review });
+  const html = reportHtml({
+    repository: basename(root),
+    evidence: projectEvidence(repository(root)),
+    ...report,
+    review,
+  });
 
   mkdirSync(dirname(destination), { recursive: true });
   const temporary = destination + "." + randomUUID();

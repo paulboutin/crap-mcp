@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import {
+  lstatSync,
   mkdirSync,
   readFileSync,
   realpathSync,
@@ -9,6 +10,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join, dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { experiments } from "./experiments.ts";
 import { adapter, languageFor } from "./languages.ts";
 import { z } from "zod";
 
@@ -68,6 +70,7 @@ export function safeFile(root: string, file: string) {
 export const configSchema = z
   .object({
     suite: z.string().min(1).default("unit"),
+    experiments: experiments.optional(),
     checks: z.array(z.array(z.string().min(1)).min(1)).optional(),
     report: z.string().min(1).optional(),
     command: z.array(z.string().min(1)).min(1).optional(),
@@ -96,7 +99,7 @@ export function repository(path: string) {
     "crap-mcp-local-v2",
   );
 
-  const { packs, omitDirectories } = projectScope(local);
+  const { packs, omitDirectories } = projectScope(root, local);
 
   return {
     root,
@@ -138,7 +141,25 @@ const scopeSchema = z.object({
   omitDirectories: directories.default([]),
 });
 
-function projectScope(local: string) {
+export const teamFile = ".crap-team.json";
+
+export function teamPath(root: string) {
+  const path = join(root, teamFile);
+
+  return lstatSync(path, { throwIfNoEntry: false })
+    ? safeFile(root, teamFile)
+    : null;
+}
+
+function projectScope(root: string, local: string) {
+  const shared = teamPath(root);
+
+  if (shared)
+    return readJson(
+      shared,
+      z.object({ version: z.literal(1), settings: scopeSchema }),
+    )!.settings;
+
   return (
     readJson(
       join(local, "quality-policy.json"),
@@ -166,7 +187,7 @@ export function policy(repo: Repo) {
 }
 
 export function checkConfig(repo: Repo) {
-  const { packs, omitDirectories } = projectScope(repo.local);
+  const { packs, omitDirectories } = projectScope(repo.root, repo.local);
 
   if (
     JSON.stringify([packs, omitDirectories]) !==
@@ -246,10 +267,17 @@ export function eligible(repo: Repo, file: string) {
   );
 }
 
-export function writeJson<T>(file: string, value: T) {
+export function writeJson<T>(file: string, value: T, pretty = false) {
   mkdirSync(dirname(file), { recursive: true });
   const tmp = file + "." + randomUUID() + ".tmp";
-  writeFileSync(tmp, JSON.stringify(value), { mode: 0o600 });
+
+  const data = pretty
+    ? JSON.stringify(value, null, 2) + "\n"
+    : JSON.stringify(value);
+
+  if (pretty && Buffer.byteLength(data) > maxSourceBytes)
+    throw Error("Team manifest exceeds the 16 MiB limit");
+  writeFileSync(tmp, data, { mode: 0o600 });
   renameSync(tmp, file);
 }
 

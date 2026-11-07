@@ -12,6 +12,8 @@ import {
   scan,
   type Snapshot,
 } from "./scan.ts";
+import { compareChecks } from "./check-comparison.ts";
+import { recentRuns } from "./check-history.ts";
 import { sessionSummary } from "./session.ts";
 import { review } from "./review.ts";
 import { prepareLanguage, type Routine } from "./syntax.ts";
@@ -87,6 +89,16 @@ function meta(s: Snapshot) {
   const { rows, churn: _churn, ...details } = s;
 
   return { ...details, functions: rows.length };
+}
+
+function sessionChecks(repo: Repo, base: Snapshot, now: Snapshot) {
+  const runs = recentRuns(repo);
+  const latest = runs.find((r) => r.metrics?.snapshot === now.id);
+
+  if (!latest?.trials?.length) return "";
+  const baseline = runs.find((r) => r.metrics?.snapshot === base.id);
+
+  return "\n" + compareChecks(latest, baseline).join("\n");
 }
 
 function reply<T>(value: T) {
@@ -241,7 +253,8 @@ export function analysisServer(select: (id?: string) => Desk, shared: boolean) {
                 " · baseline " +
                 base.id.slice(0, 12) +
                 " → " +
-                now.id.slice(0, 12),
+                now.id.slice(0, 12) +
+                sessionChecks(desk.repo, base, now),
             },
           ],
         };

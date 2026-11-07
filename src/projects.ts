@@ -1,8 +1,15 @@
 import {
+  applyPolicy,
+  edit,
   languageChange,
   setLanguage,
   qualityPolicy,
 } from "./quality-policy.ts";
+import {
+  learningInput,
+  projectEvidence,
+  recordLearning,
+} from "./project-learning.ts";
 import { recentRuns } from "./check-history.ts";
 import { basename, isAbsolute, join } from "node:path";
 import { z } from "zod";
@@ -134,6 +141,42 @@ export function sharedServer(projects: Projects) {
     },
   );
 
+  server.registerTool(
+    "record_project_learning",
+    {
+      description:
+        "Record what a cleanup changed, the finding, interpretation, and proposed rule. Links two project check timestamps and derives evidence from those checks. A proposed rule is advice until implemented.",
+      inputSchema: learningInput,
+    },
+    (q) => ({
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(recordLearning(projects.repo(q.project), q)),
+        },
+      ],
+    }),
+  );
+  server.registerTool(
+    "update_project_settings",
+    {
+      description:
+        "Apply a project policy change with a rationale recorded in the report. Supply current settings and revision.",
+      inputSchema: edit.extend({
+        project: z.string(),
+        reason: z.string().trim().min(1).max(2000),
+      }),
+    },
+    async (q) => ({
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(await applyPolicy(projects.repo(q.project), q)),
+        },
+      ],
+    }),
+  );
+
   return server;
 }
 
@@ -146,6 +189,7 @@ export async function projectReport(
 
   const report: Report = {
     repository: basename(desk.repo.root),
+    evidence: projectEvidence(desk.repo),
     snapshot: { ...snapshot, functions: rows.length },
     functions: rows.map((row) => ({ ...row, findings: findings(row) })),
     review: null,

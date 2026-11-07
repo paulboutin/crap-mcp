@@ -27,7 +27,7 @@ For other platforms or development, run `npm ci && npm run machine` in one serve
 
 ## Project settings, checks and agent feedback
 
-Select the checkout in the dashboard, then open **Project settings**. Each checkout, including a linked worktree, has its own settings, revision and check history in its Git directory. Adjust the maximum raw CRAP per function, minimum measured line coverage per function, and the enabled Oxlint and native lint rules/tools. Save to apply them to the next check. The settings page records newly enabled and removed rules, language packs and target changes. A stale browser tab must reload before saving. The standard dashboard risk bands and session grading rubric still use the documented cross-project thresholds.
+Select the checkout in the dashboard, then open **Project settings**. Settings and check history start local to each checkout. A checked-in team manifest supplies shared settings and lessons. Adjust the maximum raw CRAP per function, minimum measured line coverage per function, and the enabled Oxlint and native lint rules/tools. Save to apply them to the next check. The settings page records newly enabled and removed rules, language packs and target changes. A stale browser tab must reload before saving. The standard dashboard risk bands and session grading rubric still use the documented cross-project thresholds.
 
 For checkout-specific directory omissions, enter one literal path per line under **Directory omissions**, such as `src/generated/` or `fixtures/legacy/`. The MCP skips those subtrees in scans, coverage imports and bundled Oxlint checks. The checked-in `.crap.json` field `exclude` supplies additional shared source-analysis prefixes. Native linters and arbitrary test commands use their own ignore settings. Start a new baseline and record fresh coverage after changing scope.
 
@@ -45,6 +45,27 @@ node ~/.local/share/crap-mcp/current/dist/project-check.js "Covered the empty-in
 The checker runs the bundled Oxlint rules on JS/TS, any opted-in native linters and the project's extra checks, then wraps the designated test command with the coverage recorder. Set `report` in `.crap.json` when the report path differs from `coverage/lcov.info`. The optional `checks` field accepts argument arrays, e.g. `"checks": [["npm", "run", "typecheck"]]`. These commands run from the target checkout when the agent or developer invokes the CLI. For a foreground installation, use `node /path/to/crap-mcp/dist/project-check.js "attempt"`. Standard Oxlint correctness defaults also apply. Native linters use their own project configuration.
 
 Each attempt logs its note, time, commit, suite, policy ID, available lint counts by rule, native command exit status, coverage receipt, measured lines/functions, highest CRAP and target violations. Failed tests log a failed attempt without borrowing an earlier score. Missing coverage or a partial scan yields incomplete evidence. The checker exits nonzero for failed or incomplete runs. The dashboard and `get_project_settings` show the latest 30 attempts. Compare runs with the same suite and policy and use the function diff for attribution. This is local, retrievable feedback for the next agent session. Rules change through explicit settings edits.
+
+## Compare behavior and performance after a cleanup
+
+Ask **“Use $crap-development-review to baseline this cleanup, replay the acceptance checks, compare performance, and log what we learned.”** In `.crap.json`, configure named workloads with a version and an argument array. For example:
+
+```json
+"experiments": [
+  {"kind":"qa","name":"Replay saved match","version":"1","command":["node","qa/replay.mjs"]},
+  {"kind":"benchmark","name":"Replay 600 frames","version":"1","command":["node","qa/frame-time.mjs"],"maxMs":40}
+]
+```
+
+The QA command should check expected output (for example, each frame’s state hash) and exit nonzero on divergence. A benchmark prints one finite nonnegative JSON number in milliseconds for a fixed workload. The checker runs it five times, retains every sample, and compares medians. An optional `maxMs` budget, a bad measurement, or a failed scenario fails the check. The two-minute timeout applies per invocation. A lower CRAP score measures complexity and test coverage. Correctness and speed require their own evidence.
+
+Run the project checker before and after the change. Increment the workload version when the scenario, fixture, benchmark implementation or measurement conditions change. Matching requires the same definition, machine and Node version. Timing differences need reproduction under comparable load. The report shows the latest two attempts and labels missing or incompatible evidence. The agent can use `record_project_learning` to preserve a specific pair, explain a finding, and propose a follow-up. Applied policy changes and their reasons appear separately in the standard report. A proposal becomes enforceable when a rule is enabled or a regression check is implemented.
+
+## Share settings and findings with a team
+
+In **Project settings → Team manifest**, save your settings, then choose **Generate team manifest**. Review and commit `.crap-team.json` at the project root. Teammates who pull it use its settings automatically, including rules, thresholds, packs and directory omissions. Custom grammar packs and native linter binaries must already be available on each machine. Share the project’s `.crap.json` and workload scripts alongside it to reproduce checks.
+
+The versioned manifest stores logged lessons with before/after evidence, policy change history, and a dated snapshot of findings. **Refresh shared findings** updates that snapshot. Later settings edits and logged lessons update the working copy for normal Git review. Raw local check history stays per checkout; a teammate sees shared evidence in the report even before their first local run. Resolve manifest conflicts in Git as for other project settings.
 
 ## Language packs and native linters
 

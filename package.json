@@ -19,7 +19,7 @@
     "test": "node --test test/*.test.ts",
     "coverage": "node src/record.ts coverage/lcov.info -- node scripts/unit-coverage.mjs",
     "dogfood": "node scripts/dogfood.mjs",
-    "check": "npm run lint && npm run build && npm run coverage && npm run dogfood",
+    "check": "npm run lint && npm run build && node dist/project-check.js \"Repository self-check\" && npm run dogfood",
     "prove": "npm run build && node scripts/prove.mjs",
     "dashboard": "npm run build && node scripts/dashboard.mjs",
     "summary": "npm run build --silent && node scripts/summary.mjs",

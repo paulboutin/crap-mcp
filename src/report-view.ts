@@ -15,6 +15,7 @@ interface Review {
 }
 
 export interface Report {
+  evidence?: ReturnType<typeof import("./project-learning.ts").projectEvidence>;
   repository: string;
   functions: Row[];
   snapshot: Omit<Snapshot, "rows" | "churn"> & { functions: number };
@@ -341,7 +342,70 @@ function gaps(doc: Document, rows: Row[]) {
     .join("; ");
 }
 
+function projectHistory(doc: Document, r: Report) {
+  const data = r.evidence;
+
+  if (!data) return;
+  const panel = byId(doc, "project-history");
+  panel.hidden = false;
+
+  const add = (id: string, line: string) =>
+    byId(doc, id).append(element(doc, "li", line));
+
+  for (const line of data.checks) add("check-comparison", line);
+
+  if (!data.checks.length)
+    add("check-comparison", "No local project checks recorded.");
+
+  for (const change of data.changes)
+    add(
+      "rule-history",
+      [
+        change.at.slice(0, 10),
+        ...change.added.map((rule) => "Enabled " + rule),
+        ...change.removed.map((rule) => "Disabled " + rule),
+        "Maximum CRAP " + change.maxCrap,
+        "minimum coverage " + change.minCoverage + "%",
+        change.reason,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    );
+
+  for (const lesson of data.lessons) {
+    const group = details(doc, lesson.finding + " · " + lesson.conclusion);
+    group.append(
+      element(doc, "p", "Rule follow-up: " + lesson.nextRule),
+      element(doc, "p", lesson.before + " → " + lesson.after),
+      element(doc, "p", lesson.evidence.join(" · ")),
+    );
+    byId(doc, "lessons").append(group);
+  }
+
+  if (data.capture) {
+    const group = details(
+      doc,
+      "Shared findings · " +
+        data.capture.findings.length +
+        " at " +
+        data.capture.at +
+        (data.capture.complete ? "" : " · partial scan"),
+    );
+
+    for (const item of data.capture.findings)
+      group.append(
+        element(
+          doc,
+          "p",
+          item.file + " · " + item.symbol + " · " + item.reason,
+        ),
+      );
+    panel.append(group);
+  }
+}
+
 export function renderReport(doc: Document, r: Report) {
+  projectHistory(doc, r);
   scorePanel(doc, r);
   gaps(doc, r.functions);
   summary(doc, r);

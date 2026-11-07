@@ -1,6 +1,6 @@
 ---
 name: crap-development-review
-description: Use a connected CRAP Score MCP server to review a patch in a supported language, especially when changes begin in a dirty worktree or target an existing finding.
+description: Use a connected CRAP Score MCP server to review a patch in a supported language, compare cleanup QA and benchmark evidence, and record project-specific findings and rule changes.
 ---
 Before connecting, run `bash ~/.local/share/crap-mcp/current/scripts/ensure-service.sh`. It checks the local service and starts the installed launch agent if necessary. For a foreground installation, probe its configured /health endpoint and start the documented machine command if offline. Retry the MCP connection after it becomes healthy.
 
@@ -11,6 +11,10 @@ Read `get_project_settings`. Match the task's file extensions to the language ca
 Read recent check outcomes to see which changes helped or failed under this project's suite and policy. Call `scan_repository_hotspots` before editing and retain `snapshot.id`. Inspect affected functions with `analyze_function_health` and keep the finding ID if fixing a backlog item.
 
 Run `node ~/.local/share/crap-mcp/current/dist/project-check.js "what was tried"` from the target checkout to record starting evidence when needed and after each meaningful attempt. This runs the selected lint rules, configured checks and designated suite through the recorder. Capture failures as well as successes, and run any repository-required checks not included in the checker. If coverage is unconfigured, run the project's normal tests and report the missing evidence. Compare the latest history against a run with the same suite and policy. Use the actual function diff and test assertions to explain results.
+
+For a cleanup, run the checker **before editing** and retain the check’s `at`, alongside the scan snapshot. Choose a representative replay or acceptance scenario with an independently expected result. For speed claims use a named `.crap.json` benchmark that emits workload milliseconds, with the same input, workload version and host on both sides. Record the after check even if it fails. Inspect failed assertions or replay differences and rerun noisy timings before attributing a cause. Do not infer correctness or speed from CRAP.
+
+Use `record_project_learning` with the two check timestamps (`before`, `after`), current settings `revision`, `project`, `finding`, `conclusion`, and `nextRule`. Identify the affected symbol or finding ID and the specific change. Distinguish an observed regression, a suspected cause and a reproduced cause. The server attaches actual evidence. For a justified catalog rule or threshold change, call `update_project_settings` with the full settings, a fresh revision, and a reason referring to that finding. Implement new behavioral checks in the project’s QA harness, then rerun against a fresh baseline for the changed protocol. Summarize what passed, failed or was unmeasured in chat alongside the CRAP grade. Settings → Team manifest exports findings and lessons for Git review; when a manifest exists, policy edits and logged lessons update it.
 
 Review with `review_changes` using the starting snapshot and optional finding ID. Page findings and affected symbols separately. Address regressions caused by the patch. Report skipped files, unavailable scores and behavior checks separately. Worktree results remain provisional until the integrated revision is rescanned.
 

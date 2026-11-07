@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "settings": {
+    "maxCrap": 30,
+    "minCoverage": 0,
+    "rules": [
+      "oxc/no-accumulating-spread",
+      "anti-slop/no-array-filter-map",
+      "anti-slop/no-reduce-accumulator-copy",
+      "anti-slop/no-chained-type-assertions",
+      "anti-slop/no-conditional-empty-object-spread",
+      "anti-slop/no-known-value-widening",
+      "anti-slop/no-module-mocking",
+      "anti-slop/no-object-parameters",
+      "anti-slop/no-reflect-apply",
+      "anti-slop/no-reflect-get",
+      "anti-slop/no-runtime-typeof",
+      "anti-slop/no-shape-in-symbol-names",
+      "anti-slop/no-unknown-parameters",
+      "anti-slop/no-unknown-returns",
+      "anti-slop/no-unknown-type-aliases",
+      "anti-slop/no-unsafe-dictionary-type",
+      "anti-slop/no-widen-then-assert",
+      "anti-slop/require-readable-spacing",
+      "anti-slop/require-safety-comment-for-type-assertion"
+    ],
+    "omitDirectories": [],
+    "packs": [],
+    "linters": []
+  },
+  "changes": [],
+  "lessons": [
+    {
+      "before": "2026-11-07T22:18:18.806Z",
+      "after": "2026-11-07T22:23:47.024Z",
+      "finding": "src/check-comparison.ts · compareChecks mixed workload matching, formatting and risk comparison",
+      "conclusion": "Separating comparisons and testing a failed replay and an exceeded latency budget reduced complexity from 16 to 7. Both parser replays matched the reference. The first benchmark median rose from 19.91 to 22.94 ms. Seven alternating runs against the starting revision and this patch gave medians of 19.99 and 20.72 ms with overlapping ranges; the cause of the timing difference is unresolved.",
+      "nextRule": "Keep the fixed parser replay in the project checks. Match workload versions before comparing elapsed time and reproduce timing changes before changing a budget.",
+      "evidence": [
+        "Suite unit: passed · check passed",
+        "Before 2026-11-07T22:18:18.806Z (failed, unit tests passed) → after 2026-11-07T22:23:47.024Z (passed)",
+        "Highest measured CRAP: 242.49 → 23.59 (288/297 → 315/315 functions scored)",
+        "Replay 48 TypeScript functions · qa: passed → passed",
+        "Parse the fixture ten times · benchmark: passed → passed",
+        "Median 22.94 ms across 5 samples (previous 19.91 ms, change 3.03 ms)",
+        "Session health: Unrated · incomplete scan\n46/46 remaining affected functions scored; 0 removed; 1 files unassessed.\nFinding changes: 13 resolved.\nCRAP (lower is better, high above 30) · src/check-comparison.ts:43 · compareChecks: 242.49 → 7.00\nCRAP (lower is better, high above 30) · src/report-view.ts:345 · projectHistory: 51.97 → 9.00\nCRAP (lower is better, high above 30) · src/experiments.ts:65 · runTrial: 35.27 → 6.00"
+      ],
+      "beforeSnapshot": "41f3cbf6ffcc0052c67eaa638df57eb2d91940796eaec31512b96f3be61a6b18",
+      "afterSnapshot": "1ee2028772379f0aa3956879fc8922af2a33b335ed210432ad7598865eefa282",
+      "beforeCommit": "97071fb001086923b5fdde331a3ab09b5ce354a3",
+      "afterCommit": "97071fb001086923b5fdde331a3ab09b5ce354a3"
+    }
+  ],
+  "capture": {
+    "snapshot": "40b8aed9152e3327210f64557ad02b443468be6a32c3a1bcc5f8542e696f4fbd",
+    "at": "2026-11-07T22:26:39.937Z",
+    "complete": true,
+    "findings": []
+  }
+}

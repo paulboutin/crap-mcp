@@ -1,4 +1,6 @@
 import { qualityPolicy, applyPolicy, edit } from "./quality-policy.ts";
+import { shareProject } from "./project-learning.ts";
+import { z } from "zod";
 import { recentRuns } from "./check-history.ts";
 import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
@@ -67,6 +69,29 @@ export function machineApp(projects: Projects) {
     try {
       const repo = projects.repo(req.params.project);
       res.json(await applyPolicy(repo, parsed.data));
+    } catch (error) {
+      res.status(409).json({ error: String(error) });
+    }
+  });
+  app.post("/projects/:project/manifest", async (req, res) => {
+    const input = z
+      .object({ revision: z.string() })
+      .strict()
+      .safeParse(req.body);
+
+    if (!input.success) {
+      res.status(400).json({ error: "Expected a settings revision." });
+
+      return;
+    }
+
+    try {
+      const revision = await shareProject(
+        projects.desk(req.params.project),
+        input.data.revision,
+      );
+
+      res.json({ file: ".crap-team.json", revision });
     } catch (error) {
       res.status(409).json({ error: String(error) });
     }

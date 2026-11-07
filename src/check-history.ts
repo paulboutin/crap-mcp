@@ -1,3 +1,4 @@
+import type { Trial } from "./experiments.ts";
 import { randomUUID } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -31,6 +32,7 @@ export function measurements(s: Snapshot, targets: Targets) {
 }
 
 export interface CheckRun {
+  trials?: Trial[];
   at: string;
   note: string;
   commit: string | null;

@@ -1,3 +1,4 @@
+import { runTrial } from "./experiments.ts";
 import { adapter } from "./languages.ts";
 import { spawnSync } from "node:child_process";
 import { lstatSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -150,6 +151,8 @@ function nativeChecks(repo: Repo, settings: Targets) {
 }
 
 function outcome(run: CheckRun): CheckRun["outcome"] {
+  if (run.trials?.some((trial) => trial.status === "failed")) return "failed";
+
   if (run.tools.some((tool) => tool.status !== 0)) return "failed";
 
   if (run.lint.error || run.lint.violations || run.tests === "failed")
@@ -169,7 +172,7 @@ function metricOutcome(m: CheckRun["metrics"]): CheckRun["outcome"] {
 }
 
 export async function projectCheck(repo: Repo, note: string) {
-  const { settings, revision } = qualityPolicy(repo);
+  const { settings } = qualityPolicy(repo);
 
   const start = fingerprint(repo);
 
@@ -188,6 +191,7 @@ export async function projectCheck(repo: Repo, note: string) {
     run: null,
     lint: lintMetrics(repo, settings),
     tools: nativeChecks(repo, settings),
+    trials: repo.config.experiments?.map((spec) => runTrial(repo.root, spec)),
     tests: "unconfigured",
     metrics: null,
     error: null,
@@ -213,7 +217,8 @@ export async function projectCheck(repo: Repo, note: string) {
         s.input !== start ||
         s.run !== receipt.run ||
         s.input !== receipt.snapshot ||
-        qualityPolicy(repo).revision !== revision
+        JSON.stringify(qualityPolicy(repo).settings) !==
+          JSON.stringify(settings)
       )
         throw Error("Inputs or settings changed during checks");
       run.metrics = measurements(s, settings);
