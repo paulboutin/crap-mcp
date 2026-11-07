@@ -3,6 +3,8 @@ import { relative, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { z } from "zod";
 
+import { functionHits } from "./function-hits.ts";
+
 export const counts = z.array(
   z.tuple([z.number().int().positive(), z.number().int().nonnegative()]),
 );
@@ -113,10 +115,12 @@ export function xcJson(root: string, report: string) {
 }
 
 export function importReport(root: string, file: string) {
-  if (file.endsWith(".xcresult")) return xcArchive(root, file);
+  if (file.endsWith(".xcresult"))
+    return { lines: xcArchive(root, file), functions: {} };
   const report = readFileSync(file, "utf8");
 
-  if (file.endsWith(".json")) return istanbul(root, report);
+  if (file.endsWith(".json"))
+    return { lines: istanbul(root, report), functions: {} };
 
-  return lcov(root, report);
+  return { lines: lcov(root, report), functions: functionHits(root, report) };
 }

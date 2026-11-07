@@ -6,6 +6,7 @@ import type { Snapshot } from "./scan.ts";
 type Row = Health & { findings: Finding[] };
 
 interface Review {
+  summary?: ReturnType<typeof import("./session.ts").sessionSummary>;
   ref: string;
   commit: string;
   affected: number;
@@ -173,6 +174,15 @@ function describe(doc: Document, h: Row) {
     ),
   );
 
+  if (h.coverage.basis === "function-entry")
+    group.append(
+      element(
+        doc,
+        "p",
+        "One-line callback: measured from its own LCOV function entry count.",
+      ),
+    );
+
   if (h.coverage.uncovered.length)
     group.append(
       element(doc, "p", "Uncovered lines: " + h.coverage.uncovered.join(", ")),
@@ -269,7 +279,64 @@ function explorer(doc: Document, functions: Row[]) {
   draw();
 }
 
+function scorePanel(doc: Document, r: Report) {
+  const summary = r.review?.summary;
+  byId(doc, "session-score").textContent =
+    summary?.rating ?? "No session comparison";
+  byId(doc, "score-scope").textContent = summary
+    ? summary.measured +
+      "/" +
+      summary.total +
+      " remaining affected functions scored against " +
+      r.review!.ref
+    : "Select a starting commit or task snapshot.";
+
+  const values = r.functions
+    .flatMap((h) => (h.score === null ? [] : [h.score]))
+    .sort((a, b) => a - b);
+
+  const mid = Math.floor(values.length / 2);
+
+  const median =
+    (values[mid] + values[Math.floor((values.length - 1) / 2)]) / 2;
+
+  byId(doc, "raw-scores").textContent = values.length
+    ? "Repository CRAP · median " +
+      median.toFixed(2) +
+      " · highest " +
+      values[values.length - 1].toFixed(2) +
+      " · lower is better"
+    : "No measured repository CRAP scores.";
+
+  for (const line of summary?.examples ?? [])
+    byId(doc, "score-examples").append(element(doc, "li", "CRAP " + line));
+}
+
+function gaps(doc: Document, rows: Row[]) {
+  const reasons = new Map<string, number>();
+
+  for (const h of rows) {
+    if (h.score !== null) continue;
+    const key = h.coverage.reason ?? h.coverage.status;
+    reasons.set(key, (reasons.get(key) ?? 0) + 1);
+  }
+
+  const labels = new Map([
+    ["shared-line", "callbacks without an isolated execution count"],
+    ["no-lines", "functions without attributable line records"],
+    ["stale", "functions awaiting a matching run"],
+    ["missing", "functions missing report data"],
+    ["wrong-suite", "functions measured by a different suite"],
+  ]);
+
+  byId(doc, "gaps").textContent = [...reasons]
+    .map(([key, n]) => n + " " + (labels.get(key) ?? key))
+    .join("; ");
+}
+
 export function renderReport(doc: Document, r: Report) {
+  scorePanel(doc, r);
+  gaps(doc, r.functions);
   summary(doc, r);
   evidence(doc, r);
   patch(doc, r.review);

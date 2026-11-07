@@ -48,6 +48,10 @@ function recover(project: string, tag: string) {
     { encoding: "utf8", timeout: 60000, maxBuffer: 64 * 1024 * 1024 },
   );
 
+  return findMarkedTicket(raw, tag);
+}
+
+export function findMarkedTicket(raw: string, tag: string) {
   return issue
     .array()
     .array()

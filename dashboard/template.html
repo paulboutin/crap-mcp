@@ -33,6 +33,24 @@
         </div>
         <div id="scan-status" class="pill"></div>
       </div>
+      <section class="panel session" aria-label="Session health">
+        <small class="eyebrow">SESSION REVIEW</small>
+        <h2 id="session-score"></h2>
+        <p id="score-scope"></p>
+        <p id="raw-scores"></p>
+        <details>
+          <summary>How the session score works</summary>
+          <p>
+            Each remaining affected function earns up to 2.5 points each for
+            CRAP ≤ 30, complexity below 10, nesting below 4, and the fraction of
+            measured lines covered. We average those points across functions.
+            Higher is better. Missing coverage gives a range; skipped files
+            prevent a grade. This local rubric does not measure correctness or
+            reproduce CodeScene Code Health.
+          </p>
+        </details>
+        <ul id="score-examples"></ul>
+      </section>
       <div class="cards" aria-label="Repository metrics">
         <article>
           <span>Functions assessed</span><strong id="assessed"></strong
@@ -44,7 +62,7 @@
         </article>
         <article>
           <span>Unscored functions</span><strong id="unscored"></strong
-          ><small>Missing or insufficient evidence</small>
+          ><small>No comparable score</small>
         </article>
         <article>
           <span>Changed functions</span><strong id="changed"></strong
@@ -57,6 +75,7 @@
           id="meter"
           aria-label="Functions with measured scores"
         ></progress>
+        <p id="gaps"></p>
       </section>
       <section class="panel">
         <div class="section-head">

@@ -1,3 +1,4 @@
+import { functionHits } from "../src/function-hits.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parse } from "../src/syntax.ts";
@@ -175,4 +176,61 @@ test("detailed report imports deduplicate line hits and reject malformed or coar
     ],
     [[2, 0]],
   );
+});
+
+test("LCOV callback counters distinguish an uncalled callback from its executed enclosing line", () => {
+  const source =
+    "function f(items:number[]) {\n  return items.map(x => x + 1);\n}";
+
+  const r = parse("a.ts", source)[1];
+
+  const report =
+    "SF:a.ts\nFN:1,f\nFN:2,anonymous_1\nFNDA:5,f\nFNDA:0,anonymous_1\nDA:2,5\nend_of_record";
+
+  const run: Receipt = {
+    snapshot: "s",
+    suite: "unit",
+    at: "now",
+    run: "r",
+    files: { "a.ts": [[2, 5]] },
+    functions: functionHits("/repo", report),
+  };
+
+  assert.equal(health(r, "a.ts", "s", "unit", run).score, 2);
+  assert.deepEqual(evidence(r, "a.ts", "s", "unit", run).uncovered, [2]);
+
+  const hit = {
+    ...run,
+    functions: functionHits("/repo", report.replace("FNDA:0", "FNDA:1")),
+  };
+
+  assert.equal(health(r, "a.ts", "s", "unit", hit).score, 1);
+  assert.equal(evidence(r, "a.ts", "s", "unit", hit).basis, "function-entry");
+
+  for (const ambiguous of [
+    report + "\n" + report,
+    report.replace("FN:1,f", "FN:2,f"),
+    report.replace("FN:1,f", "FN:7,anonymous_1"),
+    report.replace("FNDA:0,anonymous_1", ""),
+    report.replace("FN:2,anonymous_1", "FN:2,4,anonymous_1"),
+  ]) {
+    assert.equal(
+      evidence(r, "a.ts", "s", "unit", {
+        ...run,
+        functions: functionHits("/repo", ambiguous),
+      }).status,
+      "insufficient",
+    );
+  }
+
+  const siblings = parse(
+    "a.ts",
+    "function f(items:number[]){\n return items.map(x=>x).map(y=>y);\n}",
+  );
+
+  assert.equal(
+    evidence(siblings[1], "a.ts", "s", "unit", hit).reason,
+    "shared-line",
+  );
+  assert.equal(evidence(r, "a.ts", "other", "unit", hit).status, "stale");
 });

@@ -9,3 +9,8 @@ builds TypeScript, records designated-suite coverage, and launches the built ser
 stdio to inspect, scan and review itself. Set CRAP_BASE to your starting commit for the
 CLI gate; use review_changes with the saved snapshot for existing uncommitted changes.
 Keep missing evidence explicit. Do not weaken the risk thresholds to make CI pass.
+
+End each coding session by calling review_changes with the starting snapshot and
+format="chat". Include its session score or unrated reason, evidence counts and
+a representative before/after CRAP score in the user-visible reply. If MCP is
+unavailable in the host, run npm run summary -- --snapshot <id> instead.

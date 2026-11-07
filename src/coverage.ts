@@ -18,6 +18,7 @@ export const receiptSchema = z.object({
   snapshot: z.string(),
   run: z.string(),
   at: z.string(),
+  functions: z.record(z.string(), counts).optional(),
   files: z.record(z.string(), counts),
 });
 
@@ -51,6 +52,8 @@ export function fingerprint(repo: Repo) {
 }
 
 export interface Evidence {
+  basis?: "function-entry";
+  reason?: "shared-line" | "no-lines";
   status: "fresh" | "missing" | "stale" | "wrong-suite" | "insufficient";
   covered: number | null;
   executable: number | null;
@@ -76,7 +79,14 @@ function measure(rows: Counts, r: Routine): Evidence {
       !r.omit.some(([from, to]) => line >= from && line <= to),
   );
 
-  if (!owned.length) return absent("insufficient");
+  if (!owned.length)
+    return {
+      ...absent("insufficient"),
+      reason:
+        r.start === r.end && r.omit.length > 0
+          ? ("shared-line" as const)
+          : ("no-lines" as const),
+    };
   const uncovered = owned.flatMap(([line, hits]) => (hits === 0 ? [line] : []));
   const covered = owned.length - uncovered.length;
 
@@ -87,6 +97,27 @@ function measure(rows: Counts, r: Routine): Evidence {
     percent: (100 * covered) / owned.length,
     uncovered,
   };
+}
+
+function measured(rows: Counts, r: Routine, counters?: Counts): Evidence {
+  if (r.callbackCounter && rows.some(([line]) => line === r.start)) {
+    const hit = counters?.find(([line]) => line === r.start);
+
+    if (hit) {
+      const covered = Number(hit[1] > 0);
+
+      return {
+        status: "fresh",
+        basis: "function-entry",
+        covered,
+        executable: 1,
+        percent: 100 * covered,
+        uncovered: covered ? [] : [r.start],
+      };
+    }
+  }
+
+  return measure(rows, r);
 }
 
 export function evidence(
@@ -104,7 +135,7 @@ export function evidence(
 
   const rows = run.files[file];
 
-  return rows ? measure(rows, r) : absent("missing");
+  return rows ? measured(rows, r, run.functions?.[file]) : absent("missing");
 }
 
 export function score(complexity: number, percent: number) {

@@ -44,7 +44,7 @@ export function record(
 
   if (snapshot !== fingerprint(repo))
     throw Error("Inputs changed during the suite");
-  const rows = importReport(repo.root, file);
+  const { lines: rows, functions } = importReport(repo.root, file);
 
   const files = Object.fromEntries(
     [...rows].flatMap(([path, lines]) =>
@@ -59,6 +59,9 @@ export function record(
 
   const result = receiptSchema.parse({
     files,
+    functions: Object.fromEntries(
+      Object.keys(files).map((file) => [file, functions[file] ?? []]),
+    ),
     snapshot,
     suite: repo.config.suite,
     run: randomUUID(),

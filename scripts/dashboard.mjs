@@ -47,9 +47,16 @@ async function scanReport() {
 }
 
 async function diffReport(snapshot) {
-  if (!snapshot.commit && !process.env.CRAP_BASE) return null;
-  const ref = process.env.CRAP_BASE ?? "HEAD";
-  const first = await call("review_changes", { base: ref, limit: 100 });
+  const saved = process.env.CRAP_SNAPSHOT;
+
+  if (!snapshot.commit && !process.env.CRAP_BASE && !saved) return null;
+
+  const ref = saved
+    ? "task snapshot " + saved.slice(0, 12)
+    : (process.env.CRAP_BASE ?? "HEAD");
+
+  const baseline = saved ? { snapshot: saved } : { base: ref };
+  const first = await call("review_changes", { ...baseline, limit: 100 });
   assert.equal(
     first.current.id,
     snapshot.id,
@@ -60,7 +67,7 @@ async function diffReport(snapshot) {
 
   while (next !== null) {
     const page = await call("review_changes", {
-      base: first.baseline.commit,
+      ...baseline,
       offset: next,
       limit: 100,
     });
@@ -76,7 +83,8 @@ async function diffReport(snapshot) {
 
   return {
     ref,
-    commit: first.baseline.commit,
+    summary: first.summary,
+    commit: first.baseline.commit ?? first.baseline.id,
     affected: first.affected.total,
     unassessed: first.unassessed,
     deltas,

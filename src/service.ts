@@ -12,6 +12,7 @@ import {
   scan,
   type Snapshot,
 } from "./scan.ts";
+import { sessionSummary } from "./session.ts";
 import { review } from "./review.ts";
 import type { Routine } from "./syntax.ts";
 
@@ -99,6 +100,7 @@ const inspect = z.object({
 });
 
 const changes = z.object({
+  format: z.enum(["data", "chat"]).default("data"),
   ...page,
   base: z.string().min(1).optional(),
   snapshot: z
@@ -190,7 +192,7 @@ export function createServer(repo: Repo) {
     "review_changes",
     {
       description:
-        "Compare changed functions to a Git revision or a recorded task snapshot. Reports provisional worktree findings, evidence gaps and metric changes.",
+        "Review a session against its starting snapshot or revision. Use format=chat at completion and show the returned session health and raw CRAP changes in your reply.",
       inputSchema: changes,
     },
     async (q) => {
@@ -198,8 +200,29 @@ export function createServer(repo: Repo) {
         base = desk.base(q.base, q.snapshot);
 
       const result = review(base, now, q.findingId);
+      const summary = sessionSummary(q.findingId ? review(base, now) : result);
+
+      if (q.format === "chat")
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text:
+                summary.chat +
+                "\nSuite: " +
+                now.suite +
+                " · run " +
+                (now.run ?? "none") +
+                " · baseline " +
+                base.id.slice(0, 12) +
+                " → " +
+                now.id.slice(0, 12),
+            },
+          ],
+        };
 
       return reply({
+        summary,
         baseline: meta(base),
         current: meta(now),
         scope: "worktree",

@@ -77,6 +77,7 @@ export interface Routine {
   depth: number;
   deepest: number;
   hash: string;
+  callbackCounter?: boolean;
   omit: [number, number][];
 }
 
@@ -190,6 +191,18 @@ function visit(
   }
 }
 
+function uniqueCallbacks(rows: Routine[]) {
+  const starts = new Map<number, number>();
+
+  for (const r of rows) starts.set(r.start, (starts.get(r.start) ?? 0) + 1);
+
+  for (const r of rows)
+    r.callbackCounter =
+      r.start === r.end && r.omit.length === 1 && starts.get(r.start) === 1;
+
+  return rows;
+}
+
 export function parse(file: string, source: string) {
   const parser = file.endsWith(".swift")
     ? parsers.swift
@@ -207,7 +220,7 @@ export function parse(file: string, source: string) {
     const state: Walk = { rows: [], counts: new Map() };
     visit(tree.rootNode, "", state, undefined, 0);
 
-    return state.rows;
+    return uniqueCallbacks(state.rows);
   } finally {
     tree.delete();
   }

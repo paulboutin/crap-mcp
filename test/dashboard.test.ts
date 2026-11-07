@@ -42,6 +42,14 @@ test("offline dashboard distinguishes risk from unscored, pages and filters, and
     repository: "demo",
     functions: fixture,
     review: {
+      summary: {
+        rating: "Unrated · incomplete scan",
+        measured: 1,
+        total: 1,
+        removed: 0,
+        examples: ["a.ts:1 · fn0: 12.00 → 1.00"],
+        chat: "",
+      },
       ref: "HEAD",
       commit: "abcdef",
       affected: 1,
@@ -75,6 +83,10 @@ test("offline dashboard distinguishes risk from unscored, pages and filters, and
 
   renderReport(doc, base);
   const text = (id: string) => doc.getElementById(id)?.textContent;
+  assert.match(text("session-score")!, /Unrated/);
+  assert.match(text("raw-scores")!, /median 6.00 · highest 132.00/);
+  assert.match(text("score-examples")!, /12.00 → 1.00/);
+  assert.match(text("gaps")!, /missing report data/);
   assert.equal(text("assessed"), "12");
   assert.equal(text("hot"), "1");
   assert.equal(text("unscored"), "1");

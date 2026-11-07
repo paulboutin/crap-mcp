@@ -354,3 +354,30 @@ footer {
     min-height: 40px;
   }
 }
+
+.session {
+  margin-bottom: 16px;
+  border-left: 4px solid var(--teal);
+}
+.session h2 {
+  font-size: 32px;
+  margin: 4px 0;
+}
+.session p,
+.session details,
+#gaps {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 6px 0;
+}
+.session details p {
+  max-width: 85ch;
+}
+.session ul {
+  padding-left: 18px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.session ul:empty {
+  display: none;
+}

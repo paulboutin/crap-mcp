@@ -171,7 +171,17 @@ try {
       [findingId, "resolved"],
     ].sort(),
   );
+
+  const chat = await client.callTool({
+    name: "review_changes",
+    arguments: { snapshot, format: "chat" },
+  });
+
+  assert.ok(!chat.isError);
+  assert.match(chat.content[0].text, /Session health: 10.0\/10/);
+  assert.match(chat.content[0].text, /describeStatus: [0-9.]+ → 2.00/);
   console.table(measurements);
+  console.log(chat.content[0].text);
   console.log(
     "Verified both original findings resolved; a failing suite could not certify a score.",
   );

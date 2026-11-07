@@ -4,6 +4,8 @@ import { evidence, score, type Receipt } from "./coverage.ts";
 import type { Routine } from "./syntax.ts";
 
 const coverage = z.object({
+  basis: z.literal("function-entry").optional(),
+  reason: z.enum(["shared-line", "no-lines"]).optional(),
   status: z.enum(["fresh", "missing", "stale", "wrong-suite", "insufficient"]),
   covered: z.number().nullable(),
   executable: z.number().nullable(),
@@ -117,7 +119,9 @@ export function findings(h: Health) {
     add(
       "coverage",
       0,
-      `No comparable score: coverage is ${h.coverage.status}.`,
+      h.coverage.reason === "shared-line"
+        ? "The callback shares a source line and has no uniquely attributable function counter."
+        : `No comparable score: coverage is ${h.coverage.status}.`,
       "Produce line coverage for this function using the designated suite.",
       "Verify a fresh score with a nonzero executable-line denominator.",
     );
