@@ -1,0 +1,184 @@
+import { createHash, randomUUID } from "node:crypto";
+import { execFileSync } from "node:child_process";
+import {
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { z } from "zod";
+
+export const digest = (data: string | Buffer) =>
+  createHash("sha256").update(data).digest("hex");
+
+export function git(root: string, ...args: string[]) {
+  return execFileSync("git", ["--no-optional-locks", "-C", root, ...args], {
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+}
+
+export function revision(root: string, ref: string) {
+  return git(
+    root,
+    "rev-parse",
+    "--verify",
+    "--end-of-options",
+    ref + "^{commit}",
+  ).trim();
+}
+
+export function maybeRevision(root: string, ref: string) {
+  try {
+    return revision(root, ref);
+  } catch {
+    return null;
+  }
+}
+
+export function safeFile(root: string, file: string) {
+  const full = resolve(root, file),
+    local = relative(root, full);
+
+  if (
+    !local ||
+    local === ".." ||
+    local.startsWith(".." + sep) ||
+    isAbsolute(local) ||
+    realpathSync(full) !== full
+  )
+    throw Error(
+      "Expected a regular file inside the repository (no symlinks): " + file,
+    );
+  const stat = statSync(full);
+
+  if (!stat.isFile() || stat.size > 16 * 1024 * 1024)
+    throw Error("Not a regular source file below 16 MiB: " + file);
+
+  return full;
+}
+
+export const configSchema = z
+  .object({
+    suite: z.string().min(1).default("unit"),
+    command: z.array(z.string().min(1)).min(1).optional(),
+    integrationBranch: z.string().min(1).default("main"),
+    exclude: z.array(z.string().min(1)).default([]),
+    criticalPaths: z.array(z.string().min(1)).default([]),
+  })
+  .strict();
+
+export type Config = z.infer<typeof configSchema>;
+
+export function repository(path: string) {
+  const root = realpathSync(git(path, "rev-parse", "--show-toplevel").trim());
+
+  const common = git(
+    root,
+    "rev-parse",
+    "--path-format=absolute",
+    "--git-common-dir",
+  ).trim();
+
+  const config = loadConfig(root);
+
+  return {
+    root,
+    config,
+    store: resolve(common, "crap-mcp-v2"),
+    local: resolve(
+      git(root, "rev-parse", "--absolute-git-dir").trim(),
+      "crap-mcp-local-v2",
+    ),
+  };
+}
+
+export function policy(repo: Repo) {
+  return digest(
+    JSON.stringify([
+      repo.config.suite,
+      repo.config.command,
+      repo.config.exclude,
+    ]),
+  );
+}
+
+export function checkConfig(repo: Repo) {
+  if (JSON.stringify(loadConfig(repo.root)) !== JSON.stringify(repo.config))
+    throw Error("Repository configuration changed; restart the MCP process");
+}
+
+function loadConfig(root: string) {
+  try {
+    return configSchema.parse(
+      JSON.parse(readFileSync(safeFile(root, ".crap.json"), "utf8")),
+    );
+  } catch (error) {
+    if (error instanceof Error && isMissing(error))
+      return configSchema.parse({});
+    throw error;
+  }
+}
+
+export function isMissing(error: Error) {
+  return error instanceof Error && "code" in error && error.code === "ENOENT";
+}
+
+export type Repo = ReturnType<typeof repository>;
+
+export function nul(output: string) {
+  return output.split("\0").filter(Boolean);
+}
+
+export function workFiles(repo: Repo) {
+  return [
+    ...new Set(
+      nul(
+        git(
+          repo.root,
+          "ls-files",
+          "--cached",
+          "--others",
+          "--exclude-standard",
+          "-z",
+        ),
+      ),
+    ),
+  ].sort();
+}
+
+export function supported(file: string) {
+  return /\.(?:[cm]?ts|tsx|swift)$/.test(file) && !/\.d\.[cm]?ts$/.test(file);
+}
+
+export function eligible(repo: Repo, file: string) {
+  return (
+    supported(file) &&
+    !file
+      .split("/")
+      .some((part) =>
+        ["node_modules", "dist", ".build", "coverage", ".git"].includes(part),
+      ) &&
+    !repo.config.exclude.some((prefix) => file.startsWith(prefix))
+  );
+}
+
+export function writeJson<T>(file: string, value: T) {
+  mkdirSync(dirname(file), { recursive: true });
+  const tmp = file + "." + randomUUID() + ".tmp";
+  writeFileSync(tmp, JSON.stringify(value), { mode: 0o600 });
+  renameSync(tmp, file);
+}
+
+export function readJson<T>(file: string, schema: z.ZodType<T>) {
+  try {
+    return schema.parse(JSON.parse(readFileSync(file, "utf8")));
+  } catch (error) {
+    if (error instanceof Error && isMissing(error)) return undefined;
+    throw error;
+  }
+}

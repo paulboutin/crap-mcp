@@ -1,0 +1,178 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { parse } from "../src/syntax.ts";
+import { health, findings } from "../src/findings.ts";
+import { evidence, score, type Receipt } from "../src/coverage.ts";
+import { lcov, istanbul, xcJson } from "../src/importers.ts";
+import { lookup } from "../src/backlog.ts";
+
+test("CRAP formula uses the full-precision coverage fraction and strict thresholds", () => {
+  assert.equal(score(16, 50), 48);
+  assert.equal(score(5, 0), 30);
+  const r = parse("a.ts", "function test() { return 0; }")[0];
+
+  const run: Receipt = {
+    snapshot: "s",
+    suite: "unit",
+    at: "now",
+    run: "r",
+    files: { "a.ts": [[1, 0]] },
+  };
+
+  for (const [cc, risk] of [
+    [5, "acceptable"],
+    [6, "high"],
+    [8, "critical"],
+  ] as const) {
+    const h = health({ ...r, complexity: cc }, "a.ts", "s", "unit", run);
+    assert.equal(h.risk, risk);
+    assert.equal(
+      findings(h).some((f) => f.rule === "crap"),
+      cc > 5,
+    );
+  }
+
+  assert.equal(score(31, 100), 31);
+});
+
+test("scopes exclude nested functions, count decisions, and survive unrelated line shifts", () => {
+  const source = `class Retry {
+  retry(n: number) {
+    function allowed(x: number) {
+      if (x && n) return true;
+      return false;
+    }
+    return n > 1 ? allowed(n) : false;
+  }
+}`;
+
+  const rows = parse("retry.ts", source);
+  assert.deepEqual(
+    rows.map((r) => [r.symbol, r.complexity, r.start, r.end]),
+    [
+      ["Retry.retry", 2, 2, 8],
+      ["Retry.retry.allowed", 3, 3, 6],
+    ],
+  );
+  const shifted = parse("retry.ts", "\n" + source);
+  assert.equal(
+    health(shifted[0], "retry.ts", "s", "unit").id,
+    health(rows[0], "retry.ts", "t", "unit").id,
+  );
+
+  const run: Receipt = {
+    snapshot: "s",
+    suite: "full",
+    run: "r",
+    at: "now",
+    files: {
+      "retry.ts": [
+        [3, 3],
+        [4, 0],
+        [5, 0],
+        [7, 1],
+      ],
+    },
+  };
+
+  assert.deepEqual(evidence(rows[0], "retry.ts", "s", "full", run), {
+    status: "fresh",
+    covered: 1,
+    executable: 1,
+    percent: 100,
+    uncovered: [],
+  });
+  assert.equal(evidence(rows[1], "retry.ts", "s", "full", run).covered, 1);
+  assert.equal(evidence(rows[0], "retry.ts", "t", "full", run).status, "stale");
+  assert.equal(
+    evidence(rows[0], "retry.ts", "s", "fast", run).status,
+    "wrong-suite",
+  );
+  assert.equal(
+    evidence(rows[0], "other.ts", "s", "full", run).status,
+    "missing",
+  );
+  assert.equal(evidence(rows[0], "retry.ts", "s", "unit").status, "missing");
+  const healths = rows.map((r) => health(r, "retry.ts", "s", "unit"));
+  assert.equal(
+    lookup(healths, "retry.ts", undefined, 4).symbol,
+    "Retry.retry.allowed",
+  );
+  assert.throws(() => lookup(healths, "retry.ts"));
+  assert.throws(() => lookup(healths, "../retry.ts", "retry"));
+});
+
+test("Swift guard, logical conditions, loops, cases, nesting and initializer", () => {
+  const source = `struct Counter {
+ init() {}
+ func count(_ n: Int) -> Int {
+   guard n > 0 && n < 10 else { return 0 }
+   for i in 0..<n {
+     if i > 2 {
+       while i == 4 {
+         if n > 5 { return i }
+       }
+     }
+   }
+   switch n {
+     case 1: return 4
+     default: return 2
+   }
+ }
+}`;
+
+  const [init, r] = parse("Counter.swift", source);
+  assert.equal(init.complexity, 1);
+  assert.equal(r.symbol, "Counter.count");
+  assert.equal(r.complexity, 8);
+  assert.equal(r.depth, 4);
+  assert.equal(r.deepest, 8);
+  assert.ok(
+    findings(health(r, "Counter.swift", "s", "unit")).some(
+      (f) => f.rule === "nesting",
+    ),
+  );
+  assert.throws(() => parse("bad.ts", "function ( {"));
+});
+
+test("detailed report imports deduplicate line hits and reject malformed or coarse data", () => {
+  assert.deepEqual(
+    [
+      ...lcov(
+        "/x",
+        "SF:/x/a.ts\nDA:1,0\nDA:1,2\nDA:2,0,abc\nend_of_record",
+      ).get("a.ts")!,
+    ],
+    [
+      [1, 2],
+      [2, 0],
+    ],
+  );
+  assert.equal(lcov("/x", "SF:a.ts\nLF:2\nLH:1\nend_of_record").size, 0);
+  assert.throws(() => lcov("/x", "SF:a.ts\nDA:-1,0"));
+
+  const json = JSON.stringify({
+    a: {
+      path: "/x/a.ts",
+      statementMap: { a: { start: { line: 4 } }, b: { start: { line: 4 } } },
+      s: { a: 2, b: 0 },
+    },
+  });
+
+  assert.equal(istanbul("/x", json).get("a.ts")?.get(4), 2);
+  assert.throws(() => istanbul("/x", '{"total":{"lines":42}}'));
+  assert.deepEqual(
+    [
+      ...xcJson(
+        "/x",
+        JSON.stringify({
+          "/x/a.swift": [
+            { line: 1, isExecutable: false },
+            { line: 2, isExecutable: true, executionCount: 0 },
+          ],
+        }),
+      ).get("a.swift")!,
+    ],
+    [[2, 0]],
+  );
+});

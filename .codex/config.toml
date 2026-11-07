@@ -1,0 +1,3 @@
+[mcp_servers.crap_score]
+command = "node"
+args = ["dist/server.js", "."]

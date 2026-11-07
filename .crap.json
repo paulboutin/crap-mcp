@@ -1,0 +1,16 @@
+{
+  "suite": "unit",
+  "integrationBranch": "main",
+  "exclude": [
+    "tools/",
+    "test/"
+  ],
+  "criticalPaths": [
+    "src/coverage.ts",
+    "src/review.ts"
+  ],
+  "command": [
+    "node",
+    "scripts/unit-coverage.mjs"
+  ]
+}

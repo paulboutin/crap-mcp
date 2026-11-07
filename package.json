@@ -1,0 +1,37 @@
+{
+  "name": "crap-score-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local function risk, coverage evidence and change review for TypeScript and Swift",
+  "type": "module",
+  "engines": {
+    "node": ">=24.12.0"
+  },
+  "bin": {
+    "crap-mcp": "./dist/server.js",
+    "crap-coverage": "./dist/record.js",
+    "crap-issues": "./dist/issue-cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "oxlint --deny-warnings .",
+    "format": "prettier --write src scripts test",
+    "test": "node --test test/*.test.ts",
+    "coverage": "node src/record.ts coverage/lcov.info -- node scripts/unit-coverage.mjs",
+    "dogfood": "node scripts/dogfood.mjs",
+    "check": "npm run lint && npm run build && npm run coverage && npm run dogfood"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@repomix/tree-sitter-wasms": "0.1.17",
+    "web-tree-sitter": "0.27.2",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@oxlint/plugins": "1.92.0",
+    "@types/node": "24.19.2",
+    "oxlint": "1.92.0",
+    "prettier": "3.9.10",
+    "typescript": "6.0.3"
+  }
+}
