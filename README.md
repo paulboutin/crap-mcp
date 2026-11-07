@@ -1,8 +1,30 @@
 # CRAP Score MCP
 
-Find functions that combine complex control flow with thin test coverage. One local HTTP service handles multiple checkouts. It scans TypeScript, TSX and Swift out of the box, supports optional language packs, keeps a backlog across Git worktrees, and reviews what changed during a task. No account, API key or hosted service is needed for analysis.
+**CRAP stands for Change Risk Anti-Patterns.** It estimates how risky a function is to change by combining the number of paths through its code (cyclomatic complexity) with how much of that code your tests execute. A function with many paths and little coverage is a good place to add a test before editing. [Background from the metric’s co-creator](https://testing.googleblog.com/2011/02/this-code-is-crap.html)
+
+This local **Model Context Protocol (MCP)** server lets your coding agent find those functions, capture a baseline, and show what changed after a patch. One service handles multiple checkouts. TypeScript, TSX and Swift work out of the box, with optional packs for other languages.
+
+**Read the two scores in opposite directions.** Lower raw CRAP means lower estimated change risk. In the dashboard, `94.51 / 30` means a function scored 94.51 against a review threshold of 30. Raw CRAP has no fixed maximum. The separate **session grade** runs up to **10/10**, with higher grades indicating healthier changed functions. [Scoring details](#what-the-numbers-mean)
 
 Original code and documentation are available under the [MIT license](LICENSE). See the [contributing guide](CONTRIBUTING.md) for local setup and pull requests, and [third-party notices](THIRD_PARTY_NOTICES.md) for vendored components and language packs.
+
+## See a hotspot before and after cleanup
+
+These screenshots follow `describeStatus` in the repo’s [HTTP-status example](test/fixtures/http-status/). Initially the function chooses between ten HTTP status codes, but the only test calls it with `200`. Open the finding to see which lines the test missed.
+
+![Function explorer showing describeStatus at critical risk: complexity 11, 12% coverage, and raw CRAP 94.51 against a threshold of 30.](docs/images/http-status-hotspot.png)
+
+| What changed | Complexity | Measured lines covered | Raw CRAP ↓ |
+| --- | ---: | ---: | ---: |
+| Baseline: one status tested | 11 | 5/43 | 94.51 |
+| Test every supported status and the fallback; keep the function unchanged | 11 | 43/43 | 11.00 |
+| Replace the branches with a table lookup; rerun the same assertions | 2 | 3/3 | 2.00 |
+
+The extra tests closed the coverage gap. The refactor then reduced the number of paths through the function. The session report shows both the final **10/10** grade and the function’s **94.51 → 2.00** raw CRAP change.
+
+![Repository health report for the HTTP-status example after cleanup, showing one assessed function, zero hotspots, and the before/after score.](docs/images/http-status-review.png)
+
+Run `npm ci` and `npm run prove` to [reproduce the measurements](#reproduce-the-end-to-end-proof).
 
 ## Try it on this repository
 
@@ -97,6 +119,10 @@ After running the suite, run `npm run dashboard` and open **.crap-local/dashboar
 ## See the session review in chat
 
 Before editing, keep the worktree snapshot ID from `scan_repository_hotspots`. At completion the project instructions and development-review skill ask the agent to call `review_changes` with `{"snapshot":"<start-id>","format":"chat"}` and relay the result in the current conversation. The MCP server returns tool results to its caller; it does not send unsolicited messages into a chat. From the shell, `npm run summary -- --snapshot <start-id>` prints the same result. Use `--base <revision>` for a commit comparison. Pass `CRAP_SNAPSHOT=<start-id> npm run dashboard` to display that same session in the dashboard. Without a starting snapshot or revision override, a clean comparison with HEAD has no work to rate.
+
+Here is the chat scorecard from the HTTP-status example above. Its unit tests supplied coverage; the example has no separate QA replay or benchmark, so both appear as **Unmeasured**.
+
+![MCP scorecard returned for the HTTP-status cleanup: 10/10 session health, one of one changed functions scored, QA replays and benchmarks unmeasured.](docs/images/http-status-scorecard.png)
 
 **Session health (/10, higher is better)** grades the final state of assessed functions affected by source or comparable score changes. Each function gets 2.5 points for CRAP ≤ 30, 2.5 for complexity < 10, 2.5 for nesting < 4, and up to 2.5 proportional to measured line coverage. Functions have equal weight. The displayed score truncates to one decimal. Missing evidence yields a provisional range when some functions are scored; entirely unscored, incomplete, unchanged or deletion-only reviews get no numeric grade. Removed functions are counted separately. This is a local review rubric, not CodeScene's proprietary Code Health score or a correctness guarantee.
 
