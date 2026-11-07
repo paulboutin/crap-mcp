@@ -3,7 +3,13 @@ import { adapter, languages } from "./languages.ts";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import { digest, readJson, writeJson, type Repo } from "./files.ts";
+import {
+  directories,
+  digest,
+  readJson,
+  writeJson,
+  type Repo,
+} from "./files.ts";
 
 export const lintTemplate = z
   .object({
@@ -38,6 +44,7 @@ export const targets = z
     maxCrap: z.number().positive().max(1000000),
     minCoverage: z.number().min(0).max(100),
     rules: ruleList,
+    omitDirectories: directories.default([]),
     packs: z
       .array(z.enum(languages.flatMap((l) => (l.core ? [] : [l.id]))))
       .default([]),
@@ -69,6 +76,7 @@ export function qualityPolicy(repo: Repo) {
       maxCrap: 30,
       minCoverage: 0,
       rules: defaults,
+      omitDirectories: [],
       packs: [],
       linters: [],
     },
@@ -79,6 +87,7 @@ export function qualityPolicy(repo: Repo) {
     ...state,
     revision: digest(JSON.stringify(state)),
     catalog,
+    analysisExclusions: repo.config.exclude,
     languages: languages.map(({ id, core, extensions, bytes, linter }) => ({
       id,
       core,
@@ -123,6 +132,7 @@ export function updatePolicy(repo: Repo, input: z.infer<typeof edit>) {
 function enabled(settings: Targets) {
   return [
     ...settings.rules,
+    ...settings.omitDirectories.map((path) => "omit/" + path),
     ...settings.packs.map((id) => "pack/" + id),
     ...settings.linters.map((id) => "linter/" + id),
   ];

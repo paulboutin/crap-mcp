@@ -124,6 +124,19 @@
             checkout chooses its own packs.
           </p>
           <fieldset id="packs" aria-label="Language packs"></fieldset>
+          <details>
+            <summary>Install a custom language pack</summary>
+            <p>
+              Place the trusted JSON manifest in
+              <code>~/.local/share/crap-mcp/languages/</code>. For a local
+              grammar, also copy the WASM file to the path named in the
+              manifest. On macOS restart the service with
+              <code
+                >launchctl kickstart -k gui/$(id
+                -u)/com.crap-score.machine</code
+              >, then reload this page, select the pack, and save.
+            </p>
+          </details>
           <h3>Native linters</h3>
           <p>
             Project checks run enabled tools from your installed toolchain.
@@ -138,6 +151,24 @@
             checks.
           </p>
           <fieldset id="rules" aria-label="Enabled rules"></fieldset>
+        </section>
+        <section>
+          <h2>Directory omissions</h2>
+          <label for="omitDirectories"
+            >Checkout-relative directories, one per line</label
+          >
+          <textarea
+            id="omitDirectories"
+            rows="4"
+            placeholder="generated/&#10;src/fixtures/"
+            style="width: min(100%, 45em)"
+          ></textarea>
+          <p>
+            These directories are excluded from CRAP analysis and bundled
+            JavaScript/TypeScript lint. Native linters and test commands use
+            their own configurations.
+          </p>
+          <small id="analysisExclusions"></small>
         </section>
         <button>Save settings</button>
       </form>
@@ -235,6 +266,10 @@
         revision = data.revision;
         for (const key of ["maxCrap", "minCoverage"])
           by(key).value = data.settings[key];
+        by("omitDirectories").value = data.settings.omitDirectories.join("\n");
+        by("analysisExclusions").textContent =
+          "Additional analysis exclusions from .crap.json: " +
+          (data.analysisExclusions.join(", ") || "none");
         by("suite").textContent =
           "Designated suite: " + data.suite + " · Report: " + data.report;
         for (const key of ["packs", "linters"]) {
@@ -298,6 +333,10 @@
           const settings = {
             maxCrap: by("maxCrap").valueAsNumber,
             minCoverage: by("minCoverage").valueAsNumber,
+            omitDirectories: by("omitDirectories")
+              .value.split("\n")
+              .map((s) => s.trim())
+              .filter(Boolean),
             packs: Array.from(
               by("packs").querySelectorAll(":checked:enabled"),
               (el) => el.value,

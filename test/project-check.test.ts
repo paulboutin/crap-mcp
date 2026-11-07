@@ -12,7 +12,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { git, repository } from "../src/files.ts";
+import { directories, git, repository } from "../src/files.ts";
 import { projectCheck } from "../src/project-check.ts";
 import { qualityPolicy, updatePolicy } from "../src/quality-policy.ts";
 import { recentRuns } from "../src/check-history.ts";
@@ -52,6 +52,11 @@ test("project checks retain real lint, suite and threshold failures for later co
     rules: [...first.settings.rules, "eslint/no-console"],
   };
 
+  settings.omitDirectories = directories.parse(["./generated/", "generated"]);
+  assert.deepEqual(settings.omitDirectories, ["generated"]);
+
+  for (const path of ["../x", "/tmp", "C:/temp", "src/../", "src/**", "."])
+    assert.equal(directories.safeParse([path]).success, false);
   const next = updatePolicy(repo, { revision: first.revision, settings });
   assert.throws(
     () => updatePolicy(repo, { revision: first.revision, settings }),
@@ -61,10 +66,21 @@ test("project checks retain real lint, suite and threshold failures for later co
   const vendor = join(root, "tools/oxlint/anti-slop");
   mkdirSync(vendor, { recursive: true });
   writeFileSync(join(vendor, "vendor.js"), 'console.log("vendored");');
-  const attempt = await projectCheck(repo, "added a log");
+  mkdirSync(join(root, "generated"));
+  writeFileSync(
+    join(root, "generated", "source.ts"),
+    'export function generated(){console.log("omitted");}',
+  );
+  mkdirSync(join(root, "generated-extra"));
+  writeFileSync(
+    join(root, "generated-extra", "source.js"),
+    "export const kept=1;",
+  );
+  const attempt = await projectCheck(repository(root), "added a log");
   assert.equal(attempt.tests, "passed");
   assert.equal(attempt.lint.rules["eslint(no-console)"], 1);
-  assert.equal(attempt.lint.files, 1);
+  assert.equal(attempt.lint.files, 2);
+  assert.equal(attempt.metrics?.total, 1);
   assert.equal(attempt.metrics?.belowCoverage, 1);
   assert.equal(attempt.metrics?.overCrap, 1);
   assert.equal(attempt.outcome, "failed");

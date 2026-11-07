@@ -96,20 +96,61 @@ export function repository(path: string) {
     "crap-mcp-local-v2",
   );
 
-  const packs = projectPacks(local);
+  const { packs, omitDirectories } = projectScope(local);
 
-  return { root, config, local, packs, store: resolve(common, "crap-mcp-v2") };
+  return {
+    root,
+    config,
+    local,
+    packs,
+    omitDirectories,
+    store: resolve(common, "crap-mcp-v2"),
+  };
 }
 
-function projectPacks(local: string) {
-  const selected = readJson(
-    join(local, "quality-policy.json"),
-    z.object({
-      settings: z.object({ packs: z.array(z.string()).default([]) }),
-    }),
+// Directory names are relative to the checkout. A trailing slash is optional.
+const directory = z
+  .string()
+  .trim()
+  .transform((value) => value.replace(/^\.\//, "").replace(/\/$/, ""))
+  .pipe(
+    z
+      .string()
+      .min(1)
+      .max(1024)
+      .refine(
+        (path) =>
+          !/^[A-Za-z]:|[\\*?[\]{}\p{Cc}]/u.test(path) &&
+          path
+            .split("/")
+            .every((part) => part !== "" && part !== "." && part !== ".."),
+        "Use a repository-relative directory path",
+      ),
   );
 
-  return selected?.settings.packs ?? [];
+export const directories = z
+  .array(directory)
+  .max(200)
+  .transform((paths) => [...new Set(paths)].sort());
+
+const scopeSchema = z.object({
+  packs: z.array(z.string()).default([]),
+  omitDirectories: directories.default([]),
+});
+
+function projectScope(local: string) {
+  return (
+    readJson(
+      join(local, "quality-policy.json"),
+      z.object({ settings: scopeSchema }),
+    )?.settings ?? scopeSchema.parse({})
+  );
+}
+
+export function omitted(repo: Repo, file: string) {
+  return repo.omitDirectories.some((directory) =>
+    file.startsWith(directory + "/"),
+  );
 }
 
 export function policy(repo: Repo) {
@@ -118,14 +159,20 @@ export function policy(repo: Repo) {
       repo.config.suite,
       repo.config.command,
       repo.config.exclude,
+      ...repo.omitDirectories.map((path) => "omit:" + path),
       ...repo.packs.map((id) => adapter(id).version),
     ]),
   );
 }
 
 export function checkConfig(repo: Repo) {
-  if (JSON.stringify(projectPacks(repo.local)) !== JSON.stringify(repo.packs))
-    throw Error("Enabled languages changed; refresh the project");
+  const { packs, omitDirectories } = projectScope(repo.local);
+
+  if (
+    JSON.stringify([packs, omitDirectories]) !==
+    JSON.stringify([repo.packs, repo.omitDirectories])
+  )
+    throw Error("Project scope changed; refresh the project");
 
   if (JSON.stringify(loadConfig(repo.root)) !== JSON.stringify(repo.config))
     throw Error("Repository configuration changed; restart the MCP process");
@@ -179,6 +226,7 @@ export function supported(file: string, packs: string[] = []) {
 export function eligible(repo: Repo, file: string) {
   return (
     supported(file, repo.packs) &&
+    !omitted(repo, file) &&
     !file
       .split("/")
       .some((part) =>

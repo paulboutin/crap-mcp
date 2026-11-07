@@ -53,6 +53,8 @@ export class Projects {
 
     if (
       cached &&
+      JSON.stringify(cached.repo.omitDirectories) ===
+        JSON.stringify(repo.omitDirectories) &&
       JSON.stringify(cached.repo.packs) === JSON.stringify(repo.packs) &&
       JSON.stringify(cached.repo.config) === JSON.stringify(repo.config)
     )

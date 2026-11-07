@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import {
   digest,
+  omitted,
   maybeRevision,
   repository,
   workFiles,
@@ -61,6 +62,7 @@ function lintSources(repo: Repo) {
   return workFiles(repo).filter(
     (file) =>
       /\.[cm]?[jt]sx?$/.test(file) &&
+      !omitted(repo, file) &&
       !lintTemplate.ignorePatterns.some((pattern) =>
         matchesGlob(file, pattern),
       ) &&

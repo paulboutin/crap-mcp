@@ -30,7 +30,10 @@ export function receipt(repo: Repo) {
 }
 
 export function fingerprint(repo: Repo) {
-  const parts: string[] = repo.packs.map((id) => adapter(id).version);
+  const parts: string[] = [
+    ...repo.packs.map((id) => adapter(id).version),
+    ...repo.omitDirectories.map((path) => "omit:" + path),
+  ];
 
   for (const file of workFiles(repo)) {
     if (

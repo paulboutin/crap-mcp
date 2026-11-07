@@ -29,6 +29,10 @@ For other platforms or development, run `npm ci && npm run machine` in one serve
 
 Select the checkout in the dashboard, then open **Project settings**. Each checkout, including a linked worktree, has its own settings, revision and check history in its Git directory. Adjust the maximum raw CRAP per function, minimum measured line coverage per function, and the enabled Oxlint and native lint rules/tools. Save to apply them to the next check. The settings page records newly enabled and removed rules, language packs and target changes. A stale browser tab must reload before saving. The standard dashboard risk bands and session grading rubric still use the documented cross-project thresholds.
 
+For checkout-specific directory omissions, enter one literal path per line under **Directory omissions**, such as `src/generated/` or `fixtures/legacy/`. The MCP skips those subtrees in scans, coverage imports and bundled Oxlint checks. The checked-in `.crap.json` field `exclude` supplies additional shared source-analysis prefixes. Native linters and arbitrary test commands use their own ignore settings. Start a new baseline and record fresh coverage after changing scope.
+
+For a rule unique to your project, enable a catalog rule in settings or add a custom rule to the project's linter configuration and run that linter through `.crap.json`'s `checks` array. The project check history records the command's exit status.
+
 Both skills probe the service before use and start the installed launch agent when it is offline. They register the current checkout, read its recent results, enable any required optional parser, then capture a baseline. Development review records each attempted change and reruns the checks. Backlog triage records the starting evidence and uses earlier outcomes when choosing a task. Example: **“Use $crap-development-review, enable Python for this project, and check my change.”**
 
 From the target checkout, run the same workflow manually:
