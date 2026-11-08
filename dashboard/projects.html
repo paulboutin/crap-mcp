@@ -87,6 +87,7 @@
       ></a>
       <label for="project">Project</label
       ><select id="project" disabled></select>
+      <a id="report-mode" hidden></a>
       <a
         id="settings"
         class="icon-link"
@@ -104,9 +105,25 @@
       const frame = document.querySelector("#current");
       const status = document.querySelector("#status");
       const query = new URLSearchParams(location.search);
+      async function selectedReport(report) {
+        if (report.search) return report;
+        const recorded = new URL(report.pathname + "/recorded", report);
+        const response = await fetch(recorded, { method: "HEAD" });
+        if (response.status !== 200) return report;
+        const live = query.get("view") === "live";
+        const next = new URL(location.href);
+        if (live) next.searchParams.delete("view");
+        else next.searchParams.set("view", "live");
+        const link = document.querySelector("#report-mode");
+        link.href = next;
+        link.textContent = live ? "View recorded report" : "View live checkout";
+        link.hidden = false;
+        return live ? report : recorded;
+      }
       function loadReport(report) {
+        const recorded = report.pathname.endsWith("/recorded");
         const saved = document.querySelector("#saved");
-        status.textContent = "Loading the current project report…";
+        status.textContent = recorded ? "Loading the recorded report…" : "Loading the current project report…";
         const preview = new URL(report);
         preview.searchParams.set("preview", "saved");
         let failed = false;
@@ -116,12 +133,12 @@
             if (!failed) status.textContent = "Showing the last saved function scan while the current report loads…";
           }
         };
-        const timer = setTimeout(() => { saved.src = preview.href; }, 1000);
+        const timer = recorded ? undefined : setTimeout(() => { saved.src = preview.href; }, 1000);
         frame.onload = () => {
           if (frame.contentDocument?.URL === "about:blank") return;
           clearTimeout(timer);
           if (!frame.contentDocument?.getElementById("range")?.textContent) {
-            status.textContent = "Could not load the current report. " +
+            status.textContent = "Could not load the report. " +
               (frame.contentDocument?.querySelector("pre")?.textContent || "Reload to try again.");
             failed = true;
             return;
@@ -132,7 +149,7 @@
         };
         frame.src = report.href;
       }
-      function display() {
+      async function display() {
         const id = query.get("project") || select.options[0]?.value;
         select.value = id ?? "";
         if (!select.value) {
@@ -161,7 +178,7 @@
           status.hidden = true;
           frame.hidden = false;
           frame.src = "/settings?project=" + encodeURIComponent(id);
-        } else loadReport(report);
+        } else loadReport(await selectedReport(report));
       }
       try {
         const response = await fetch("/projects");
@@ -182,7 +199,7 @@
           query.delete("view");
           location.search = query;
         };
-        display();
+        await display();
       } catch (error) {
         status.textContent = String(error);
       }

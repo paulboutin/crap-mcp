@@ -1,3 +1,6 @@
+import { execFileSync } from "node:child_process";
+import { recordedReportPath } from "../src/report-html.ts";
+import { fingerprint } from "../src/coverage.ts";
 import { renderReport } from "../src/report-view.ts";
 import assert from "node:assert/strict";
 import { z } from "zod";
@@ -18,7 +21,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { JSDOM } from "jsdom";
 import { machineApp } from "../src/machine-app.ts";
 import { Projects, projectReport } from "../src/projects.ts";
-import { git } from "../src/files.ts";
+import { git, writeJson } from "../src/files.ts";
 
 test("one HTTP service isolates same-name checkouts across clients, dashboard selections and restart", async (t) => {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "crap-machine-")));
@@ -220,10 +223,23 @@ test("dashboard shows the saved scan during refresh and invalidates the full rep
   const { port } = z.object({ port: z.number() }).parse(server.address());
   const url = "http://127.0.0.1:" + port + "/report/" + id;
   const preview = url + "?preview=saved";
+  const recorded = url + "/recorded";
+  assert.equal((await fetch(recorded, { method: "HEAD" })).status, 204);
   assert.equal((await fetch(preview)).status, 204);
   writeFileSync(join(root, "code.ts"), "function savedFunction() {}");
+  writeFileSync(join(root, ".gitignore"), ".crap-local/\n");
+  writeFileSync(join(root, ".crap.json"), '{"suite":"audit-tests"}');
+  const repo = projects.repo(id);
+  writeJson(join(repo.local, "coverage.json"), {
+    files: { "code.ts": [[1, 1]] }, snapshot: fingerprint(repo), suite: "audit-tests",
+    run: "test-run", at: new Date().toISOString(),
+  });
+  execFileSync(process.execPath, ["scripts/dashboard.mjs", root], {
+    env: { ...process.env, CRAP_BASE: "", CRAP_SNAPSHOT: "" },
+  });
   const first = await (await fetch(url)).text();
   assert.equal(await (await fetch(url)).text(), first);
+  rmSync(join(root, ".crap.json"));
   writeFileSync(join(root, "code.ts"), "function currentFunction() {}");
   const cached = await (await fetch(preview)).text();
   assert.match(cached, /"symbol":"savedFunction"/);
@@ -232,6 +248,20 @@ test("dashboard shows the saved scan during refresh and invalidates the full rep
   const current = await left.text();
   assert.equal(await right.text(), current);
   assert.match(current, /"symbol":"currentFunction"/);
+  assert.match(current, /"status":"wrong-suite"/);
+  assert.equal((await fetch(recorded, { method: "HEAD" })).status, 200);
+  const doc = new JSDOM(await (await fetch(recorded)).text()).window.document;
+  renderReport(doc, JSON.parse(doc.getElementById("data")!.textContent!));
+  assert.equal(doc.querySelector("h1")!.textContent, "Recorded repository report");
+  assert.equal(doc.querySelector("tbody summary")!.textContent, "savedFunction");
+  assert.equal(doc.getElementById("fraction")!.textContent, "1 of 1 functions scored");
+  assert.match(doc.getElementById("meta")!.textContent!, /audit-tests/);
+  rmSync(recordedReportPath(repo.local));
+  const legacy = await (await fetch(recorded)).text();
+  const original = new JSDOM(legacy).window.document;
+  renderReport(original, JSON.parse(original.getElementById("data")!.textContent!));
+  assert.equal(original.getElementById("fraction")!.textContent, "1 of 1 functions scored");
+  assert.equal(original.querySelector("h1")!.textContent, "Recorded repository report");
   writeFileSync(join(root, "page.html"), '<html><img src="a"></html>');
   const changed = await (await fetch(url)).text();
   assert.match(changed, /"file":"page.html"/);

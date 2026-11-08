@@ -22,6 +22,8 @@ interface Review {
 }
 
 export interface Report {
+  recorded?: boolean;
+  auditNotes?: string[];
   evidence?: ReturnType<typeof import("./project-learning.ts").projectEvidence>;
   accessibility?: import("./accessibility.ts").AccessibilityReport;
   security?: import("./security.ts").SecurityReport;
@@ -111,11 +113,20 @@ function summary(doc: Document, r: Report) {
       "Scanned " +
       new Date(s.at).toLocaleString() +
       " · " +
-      (s.commit?.slice(0, 8) ?? "uncommitted"),
+      (s.commit?.slice(0, 8) ?? "uncommitted") +
+      " · " +
+      s.suite,
     assessed: r.functions.length,
     filecount: s.files + " source files assessed",
     hot: r.functions.filter(isHot).length,
     unscored: r.functions.length - measured,
+    "critical-count":
+      r.functions.filter((h) => (h.score ?? 0) > 60).length + " above 60",
+    "structure-count":
+      r.functions.filter((h) => h.complexity >= 10).length +
+      " functions with complexity ≥10 · " +
+      r.functions.filter((h) => h.depth >= 4).length +
+      " with nesting ≥4",
     changed: r.review?.affected ?? "—",
     comparison: r.review
       ? "Compared with " + r.review.ref
@@ -283,7 +294,7 @@ function row(doc: Document, h: Row) {
   const coverage =
     h.coverage.percent === null
       ? h.coverage.status
-      : h.coverage.percent.toFixed(0) + "%";
+      : Number(h.coverage.percent.toFixed(1)) + "%";
 
   const bands = {
     acceptable: "Within threshold",
@@ -400,6 +411,18 @@ function sessionRows(doc: Document, rows: Contribution[]) {
   }
 }
 
+function auditContext(doc: Document, r: Report) {
+  if (r.recorded) {
+    doc.querySelector("h1")!.textContent = "Recorded repository report";
+    byId(doc, "session-score").closest("section")!.hidden = !r.review?.summary;
+  }
+
+  const notes = byId(doc, "audit-notes");
+
+  for (const note of r.auditNotes ?? []) notes.append(element(doc, "li", note));
+  notes.hidden = !notes.childElementCount;
+}
+
 function scorePanel(doc: Document, r: Report) {
   const summary = r.review?.summary;
   const contributions = r.review?.contributions ?? [];
@@ -415,25 +438,41 @@ function scorePanel(doc: Document, r: Report) {
       r.review!.ref
     : "Select a starting commit or task snapshot.";
 
-  const values = r.functions
-    .flatMap((h) => (h.score === null ? [] : [h.score]))
-    .sort((a, b) => a - b);
-
-  const mid = Math.floor(values.length / 2);
-
-  const median =
-    (values[mid] + values[Math.floor((values.length - 1) / 2)]) / 2;
-
-  byId(doc, "raw-scores").textContent = values.length
-    ? "Repository CRAP · median " +
-      median.toFixed(2) +
-      " · highest " +
-      values[values.length - 1].toFixed(2) +
-      " · high above 30 · lower is better"
-    : "No measured repository CRAP scores.";
-
   for (const line of summary?.examples ?? [])
     byId(doc, "score-examples").append(element(doc, "li", "CRAP " + line));
+}
+
+function repositoryScores(doc: Document, functions: Row[]) {
+  const scored = functions
+    .flatMap((h) => (h.score === null ? [] : [{ row: h, score: h.score }]))
+    .sort((a, b) => a.score - b.score);
+
+  const peak = scored.at(-1);
+  const label = byId(doc, "raw-scores");
+
+  if (!peak) {
+    label.textContent = "No measured repository CRAP scores.";
+
+    return;
+  }
+
+  const median =
+    (scored[Math.floor(scored.length / 2)].score +
+      scored[Math.floor((scored.length - 1) / 2)].score) /
+    2;
+
+  label.textContent =
+    "Repository CRAP · median " +
+    median.toFixed(2) +
+    " · highest " +
+    peak.score.toFixed(2) +
+    " · " +
+    peak.row.symbol +
+    " (" +
+    peak.row.file +
+    ":" +
+    peak.row.start +
+    ")";
 }
 
 function gaps(doc: Document, rows: Row[]) {
@@ -855,7 +894,9 @@ export function renderReport(
   accessibilityPanel(doc, r);
   securityPanel(doc, r);
   projectHistory(doc, r);
+  auditContext(doc, r);
   scorePanel(doc, r);
+  repositoryScores(doc, r.functions);
   gaps(doc, r.functions);
   summary(doc, r);
   evidence(doc, r);
