@@ -77,7 +77,7 @@ export function sessionMarkdown(
     "",
     `**Project check** ${checkLabel(latest?.outcome)} · **Finding changes** ${summary.changes}`,
     "",
-    `${summary.removed} functions removed · ${unassessed} files unassessed`,
+    `Functions removed **${summary.removed}** · Files unassessed **${unassessed}**`,
   ];
 
   if (summary.functions.length) {
