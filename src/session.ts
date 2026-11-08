@@ -105,17 +105,16 @@ function highlights(rows: Pair[]) {
   return ranked.slice(0, 3).map((p) => {
     const h = p.after ?? p.before!;
 
-    return (
-      h.file +
-      ":" +
-      h.start +
-      " · " +
-      h.symbol +
-      ": " +
-      raw(p.before) +
-      " → " +
-      raw(p.after)
-    );
+    return {
+      location: h.file + ":" + h.start,
+      symbol: h.symbol,
+      before: raw(p.before),
+      after: raw(p.after),
+      delta:
+        p.before?.score != null && p.after?.score != null
+          ? p.after.score - p.before.score
+          : null,
+    };
   });
 }
 
@@ -130,7 +129,11 @@ export function sessionSummary(result: Review) {
   const changes =
     [...counts].map(([status, n]) => n + " " + status).join(", ") || "none";
 
-  const examples = highlights(result.affected);
+  const functions = highlights(result.affected);
+
+  const examples = functions.map(
+    (h) => h.location + " · " + h.symbol + ": " + h.before + " → " + h.after,
+  );
 
   return {
     rating: score,
@@ -138,6 +141,7 @@ export function sessionSummary(result: Review) {
     total: t.total,
     removed: t.removed,
     examples,
+    functions,
     changes,
     chat: [
       "Session health: " + score,

@@ -53,6 +53,7 @@ test("offline dashboard distinguishes risk from unscored, pages and filters, and
         rating: "Unrated · incomplete scan",
         measured: 1,
         changes: "1 new",
+        functions: [],
         total: 1,
         removed: 0,
         examples: ["a.ts:1 · fn0: 12.00 → 1.00"],

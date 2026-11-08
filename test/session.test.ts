@@ -108,20 +108,26 @@ test("Markdown keeps missing evidence explicit and repository text literal", () 
     [mixed, "🟡"],
     [missing, "⚪"],
   ] as const) {
-    const card = sessionMarkdown(
-      summary,
-      0,
-      undefined,
-      ["test `name`\n\x1b[31m**failed**"],
-      "unit",
-    );
-
+    const card = sessionMarkdown(summary, 0, undefined, []);
     assert.ok(
-      card.startsWith(marker + " **Session health · " + summary.rating + "**"),
+      card.startsWith(
+        "## " + marker + " " + summary.rating + " · Session health",
+      ),
     );
-    assert.ok(card.includes("`` test `name` **failed** ``"));
-    assert.match(card, /Benchmarks:\*\* Unmeasured/);
+    assert.match(card, /Unmeasured \| Unmeasured \|/);
   }
+
+  const symbol = "test `name`|\n\x1b[31m**failed**";
+
+  const renamed = sessionSummary({
+    ...clean,
+    affected: [{ before: absent, after: { ...good, symbol } }],
+  });
+
+  assert.match(
+    sessionMarkdown(renamed, 0, undefined, []),
+    /\| `` test `name` ``\\\|` \*\*failed\*\* ` \| unscored \| \*\*1.00\*\* \| — \|/,
+  );
 
   assert.equal(
     artifactLink("Report", "/reports/a (b)/#1.html"),

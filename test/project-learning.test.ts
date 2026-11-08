@@ -102,7 +102,7 @@ test("replay failures and benchmark regressions survive sharing and a fresh clon
     ["text"],
   );
   const body = z.object({ text: z.string() }).parse(markdown.content[0]).text;
-  assert.match(body, /\*\*Session health · /);
+  assert.match(body, /^## .* · Session health/m);
   assert.match(body, /0\/1 passed/);
   assert.match(body, /Replay · qa: passed → failed/);
   assert.match(body, /\[Detailed report\]\(/);

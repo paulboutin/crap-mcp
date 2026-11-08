@@ -32,17 +32,34 @@ export function artifactLink(label: string, path: string) {
 }
 
 function headline(title: string, grade: string) {
+  let marker = "🔵";
+
   if (grade.startsWith("Unrated") || grade.startsWith("Not applicable"))
-    return "⚪ **" + title + " · " + grade + "**";
+    marker = "⚪";
+  else if (grade.includes("provisional")) marker = "🟡";
 
-  if (grade.includes("provisional"))
-    return "🟡 **" + title + " · " + grade + "**";
-
-  return "🔵 **" + title + " · " + grade + "**";
+  return `## ${marker} ${grade} · ${title}`;
 }
 
-function bullet(label: string, value: string) {
-  return "- **" + label + ":** " + value;
+// A table pipe is structural even inside a GFM code span.
+function symbolCell(symbol: string) {
+  return symbol.split("|").map(literal).join("\\|");
+}
+
+function deltaCell(delta: number | null) {
+  if (delta === null) return "—";
+
+  if (delta === 0) return "0.00";
+
+  return (delta > 0 ? "↑ +" : "↓ −") + Math.abs(delta).toFixed(2);
+}
+
+function checkLabel(state = "unmeasured") {
+  if (state === "passed") return "✅ Passed";
+
+  if (state === "failed") return "❌ Failed";
+
+  return "⚪ " + state.charAt(0).toUpperCase() + state.slice(1);
 }
 
 export function sessionMarkdown(
@@ -50,44 +67,42 @@ export function sessionMarkdown(
   unassessed: number,
   latest: CheckRun | undefined,
   checks: string[],
-  provenance: string,
 ) {
   const lines = [
     headline("Session health", summary.rating),
     "",
-    bullet(
-      "Evidence",
-      summary.measured +
-        "/" +
-        summary.total +
-        " remaining affected functions scored · " +
-        summary.removed +
-        " removed · " +
-        unassessed +
-        " files unassessed",
-    ),
-    bullet("Finding changes", summary.changes),
-    bullet("QA replays", trialStatus(latest, "qa")) +
-      " · **Benchmarks:** " +
-      trialStatus(latest, "benchmark"),
+    "| Functions scored | Test suite | QA replays | Benchmarks |",
+    "| ---: | :--- | :--- | :--- |",
+    `| **${summary.measured}/${summary.total}** | ${checkLabel(latest?.tests)} | ${trialStatus(latest, "qa")} | ${trialStatus(latest, "benchmark")} |`,
+    "",
+    `**Project check** ${checkLabel(latest?.outcome)} · **Finding changes** ${summary.changes}`,
+    "",
+    `${summary.removed} functions removed · ${unassessed} files unassessed`,
   ];
 
-  if (summary.examples.length)
+  if (summary.functions.length) {
     lines.push(
       "",
-      "**Function CRAP** · lower is better; high above 30",
+      "### Function CRAP",
       "",
-      ...summary.examples.map((example) => "- " + literal(example)),
+      "| Function | Before | After | Change |",
+      "| :--- | ---: | ---: | ---: |",
+      ...summary.functions.map(
+        (h) =>
+          `| ${symbolCell(h.symbol)} | ${h.before} | **${h.after}** | ${deltaCell(h.delta)} |`,
+      ),
+      "",
+      "Lower is better · high above 30",
     );
+  }
 
-  if (checks.length)
+  if (latest && latest.outcome !== "passed")
     lines.push(
       "",
-      "**Recorded checks**",
+      "### Check details",
       "",
       ...checks.map((item) => "- " + literal(item)),
     );
-  lines.push("", literal(provenance));
 
   return lines.join("\n");
 }
@@ -96,36 +111,46 @@ export function securityMarkdown(r: SecurityReport) {
   return [
     headline("Application security", r.headline),
     "",
-    bullet("Evidence", r.detail),
-    bullet("Comparison", r.comparisonText),
-    bullet(
-      "Scope",
-      r.rules.length +
-        " enabled source rules · OWASP Top 10:2025 · " +
-        r.version,
-    ),
+    "| Files assessed | Unassessed | Findings | Rules |",
+    "| ---: | ---: | ---: | ---: |",
+    `| **${r.assessed}** | ${r.skipped.length} | **${r.findings.length}** | ${r.rules.length} |`,
     "",
-    "Higher scores indicate fewer findings in assessed source. This scan does not certify security.",
+    r.score === null ? r.detail : "",
+    "**Comparison** · " + r.comparisonText,
     "",
-    "Snapshot: " + literal(r.snapshot),
+    `OWASP Top 10:2025 · ${r.version} · assessed source only`,
+    "",
+    "Snapshot " + literal(r.snapshot),
   ].join("\n");
 }
 
-export function accessMarkdown(r: AccessibilityReport, color: string) {
+export function accessMarkdown(
+  r: AccessibilityReport,
+  colorScore: string,
+  colorEvidence: string,
+) {
   const lines = [
     headline("Accessibility", r.headline),
     "",
-    bullet("Evidence", r.detail + " · " + r.scope),
-    bullet("Color vision", color),
-    bullet("Comparison", r.comparisonText),
+    "| Passed | Failed | Need review |",
+    "| ---: | ---: | ---: |",
+    `| **${r.passed}** | **${r.findings.length}** | ${r.pending.length} |`,
+    "",
+    r.scope,
+    "",
+    "### " + colorScore + " · Colorblind score",
+    "",
+    colorEvidence,
+    "",
+    "**Comparison** · " + r.comparisonText,
   ];
 
-  if (r.reason) lines.push(bullet("Rating evidence", r.reason));
+  if (r.reason) lines.push("", r.reason);
   lines.push(
     "",
     "WCAG 2.2 and Revised Section 508 · source checks only.",
     "",
-    "Snapshot: " + literal(r.snapshot),
+    "Snapshot " + literal(r.snapshot),
   );
 
   return lines.join("\n");
