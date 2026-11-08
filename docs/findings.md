@@ -2,6 +2,14 @@
 
 The dashboard opens with score summaries. Expand a finding to see the file, affected line range, numbered excerpt when available, why the rule matched, its potential impact, how it affects the score, and how to repair and verify it.
 
+## Inspect a function recommendation
+
+In **Function explorer**, set **Show** to **Functions with code patterns**. Search for a function, expand its name, and open the rule underneath it. If the function has more than five findings, search for its name in **Code patterns** to see the rest.
+
+![Expanded no-floating-promises finding for the fictional submitNote function. The suggested action is to await or return the promise, or handle rejection deliberately.](images/function-recommendation.png)
+
+Here, `submitNote` calls `saveNote(text)` without waiting for the result. If the caller needs to know whether the save succeeded, return the promise with `return saveNote(text)`. To verify the fix, make `saveNote` reject in a test and assert that the caller receives the error. Rerun the language check to confirm the finding clears. You can use this recommendation even when the function has no coverage score.
+
 ## Walk through a security finding
 
 Suppose a query passes a template string containing a user-supplied ID directly to a database driver.

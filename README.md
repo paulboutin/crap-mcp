@@ -47,6 +47,14 @@ The extra tests closed the coverage gap. The refactor then reduced the number of
 
 Run `npm ci` and `npm run prove` to [reproduce the measurements](#reproduce-the-end-to-end-proof).
 
+## Inspect a recommendation for one function
+
+In **Function explorer**, select **Functions with code patterns**, expand a function, then open its rule. In this fictional example, `submitNote` calls `saveNote(text)` and returns before the save finishes. Oxlint identifies the unhandled promise even without test coverage.
+
+![Expanded Oxlint finding for submitNote showing the source line, the risk of an unhandled rejection, and how to fix and verify it.](docs/images/function-recommendation.png)
+
+The [finding walkthrough](docs/findings.md#inspect-a-function-recommendation) shows how to test the rejected save.
+
 ## Try it on this repository
 
 Requires Git and Node.js 24.12+ (CI runs Node 24). From the clone root:
