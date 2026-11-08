@@ -194,15 +194,21 @@ Before editing, keep the worktree snapshot ID from `scan_repository_hotspots`. A
 
 The default skill reply is Markdown text. For the HTTP-status example, the main results read:
 
-🔵 **Session health · 10.0/10**
+## 🔵 10.0/10 · Session health
 
-- **Evidence:** 1/1 remaining affected functions scored · 0 removed · 0 files unassessed
-- **QA replays:** Unmeasured · **Benchmarks:** Unmeasured
-- **Function CRAP:** `describeStatus: 94.51 → 2.00`
+| Functions scored | Test suite | QA replays | Benchmarks |
+| ---: | :--- | :--- | :--- |
+| **1/1** | ✅ Passed | Unmeasured | Unmeasured |
 
-Return the card in the assistant reply outside a code block. Blue accompanies a measured grade, yellow a provisional range, and a neutral marker an unavailable grade. Each state is also written as a score or label. The HTML report contains the full evidence. Use `format:"chat"` for the original plain text, or add `scorecard:true` to either presentation format for the [PNG export](docs/images/http-status-scorecard.png). The default MCP data format still supports pagination.
+### Function CRAP
 
-Claude Code documents Markdown in its [terminal](https://code.claude.com/docs/en/troubleshooting#large-tables-are-cut-off-in-the-terminal). OpenCode's [assistant renderer](https://github.com/anomalyco/opencode/blob/v1.14.25/packages/opencode/src/cli/cmd/tui/routes/session/index.tsx) uses its [terminal theme](https://opencode.ai/docs/themes/). Codex also renders [Markdown in its terminal](https://github.com/openai/codex/blob/main/codex-rs/tui/src/markdown_render.rs), and VS Code chat supports [Markdown responses](https://code.visualstudio.com/api/extension-guides/ai/chat). The card uses bold text, bullets and links without relying on a client's text colors, HTML, ANSI escapes or table layout.
+| Function | Before | After | Change |
+| :--- | ---: | ---: | ---: |
+| `describeStatus` | 94.51 | **2.00** | ↓ −92.51 |
+
+Return the score heading and tables directly in the assistant reply outside a code block. Blue accompanies a measured grade, yellow a provisional range, and a neutral marker an unavailable grade. Each state is also written as a score or label. The HTML report contains the full evidence. Use `format:"chat"` for the original plain text, or add `scorecard:true` to either presentation format for the [PNG export](docs/images/http-status-scorecard.png). The default MCP data format still supports pagination.
+
+Claude Code documents Markdown in its [terminal](https://code.claude.com/docs/en/troubleshooting#large-tables-are-cut-off-in-the-terminal). OpenCode's [assistant renderer](https://github.com/anomalyco/opencode/blob/v1.14.25/packages/opencode/src/cli/cmd/tui/routes/session/index.tsx) uses its [terminal theme](https://opencode.ai/docs/themes/). Codex also renders [Markdown in its terminal](https://github.com/openai/codex/blob/main/codex-rs/tui/src/markdown_render.rs), and VS Code chat supports [Markdown responses](https://code.visualstudio.com/api/extension-guides/ai/chat). The card uses Markdown headings, short table headers, numeric columns and links. Terminal themes control the colors.
 
 **Session health (/10, higher is better)** grades the final state of assessed functions affected by source or comparable score changes. Each function gets 2.5 points for CRAP ≤ 30, 2.5 for complexity < 10, 2.5 for nesting < 4, and up to 2.5 proportional to measured line coverage. Functions have equal weight. The displayed score truncates to one decimal. Missing evidence yields a provisional range when some functions are scored; entirely unscored, incomplete, unchanged or deletion-only reviews get no numeric grade. Removed functions are counted separately. This is a local review rubric, not CodeScene's proprietary Code Health score or a correctness guarantee.
 

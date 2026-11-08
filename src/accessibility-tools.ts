@@ -48,14 +48,16 @@ async function chat(
   card: boolean,
   format: CardFormat,
 ) {
-  const color =
-    "Colorblind score · " +
-    (r.colorblind.score === null ? "Unrated" : r.colorblind.score + "/100") +
-    " · " +
+  const colorScore =
+    r.colorblind.score === null ? "Unrated" : r.colorblind.score + "/100";
+
+  const colorEvidence =
     r.colorblind.passed +
     "/" +
     r.colorblind.measured +
     " measured pairs pass all three simulations";
+
+  const color = "Colorblind score · " + colorScore + " · " + colorEvidence;
 
   const message = {
     type: "text" as const,
@@ -83,7 +85,7 @@ async function chat(
 
   message.text =
     format === "markdown"
-      ? accessMarkdown(r, color) +
+      ? accessMarkdown(r, colorScore, colorEvidence) +
         "\n\n" +
         artifactLink("Detailed report", report)
       : message.text + "\nDetailed report: " + report;

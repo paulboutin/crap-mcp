@@ -136,7 +136,6 @@ async function chatReview(
     "snapshot " + base.id.slice(0, 12),
   );
   const summary = report.review.summary!;
-  const path = saveFindingReport(repo.local, base.id + "-" + now.id, report);
   const runs = recentRuns(repo);
   const latest = matchingCheck(repo, now, runs);
 
@@ -154,15 +153,12 @@ async function chatReview(
     ? compareChecks(latest, matchingCheck(repo, base, runs))
     : [];
 
+  report.auditNotes = [suite, ...checks];
+  const path = saveFindingReport(repo.local, base.id + "-" + now.id, report);
+
   const text =
     format === "markdown"
-      ? sessionMarkdown(
-          summary,
-          changes.unassessed.length,
-          latest,
-          checks,
-          suite,
-        ) +
+      ? sessionMarkdown(summary, changes.unassessed.length, latest, checks) +
         "\n\n" +
         artifactLink("Detailed report", path)
       : [

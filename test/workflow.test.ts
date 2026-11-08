@@ -465,7 +465,7 @@ test("security MCP scans syntax, compares a dirty baseline and renders a separat
   );
   assert.match(
     z.object({ text: z.string() }).parse(md.content[0]).text,
-    /Application security · 65\/100/,
+    /^## .*65\/100 · Application security/m,
   );
 
   const card = await c.callTool({
@@ -557,7 +557,7 @@ test("accessibility MCP preserves a dirty baseline, reports known results separa
     ["text"],
   );
   const body = z.object({ text: z.string() }).parse(md.content[0]).text;
-  assert.match(body, /Accessibility · 50\/100/);
+  assert.match(body, /^## .*50\/100 · Accessibility/m);
   assert.match(body, /Colorblind score/);
   const old = await call(c, review, { base: "HEAD", current: first.snapshot });
   assert.equal(old.comparison.introduced.total, 2);
