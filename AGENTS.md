@@ -2,7 +2,7 @@
 
 Use this server on its own source. In a fresh checkout run `npm ci && npm run build` first.
 Before editing, save the current scan's snapshot ID (especially in a dirty worktree).
-The development-review and backlog-triage skills are in .agents/skills/.
+The development review, backlog triage, application security and accessibility review skills are in .agents/skills/.
 
 Run `npm run check` before finishing. It lints with every generic vendored anti-slop rule,
 builds TypeScript, records designated-suite coverage, and launches the built server over

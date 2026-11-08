@@ -1,10 +1,18 @@
 # CRAP Score MCP
 
+> **Documentation preview.** The security, accessibility, color vision and expanded finding reports described below require the updated MCP server. GitHub’s [base revision](https://github.com/paulboutin/crap-mcp/tree/697eadd31f07e0c1e38e4fe9c148de934268691e) ships the CRAP tools. This documentation branch contains the guides and skills only.
+
 **CRAP stands for Change Risk Anti-Patterns.** It estimates how risky a function is to change by combining the number of paths through its code (cyclomatic complexity) with how much of that code your tests execute. A function with many paths and little coverage is a good place to add a test before editing. [Background from the metric’s co-creator](https://testing.googleblog.com/2011/02/this-code-is-crap.html)
 
 This local **Model Context Protocol (MCP)** server lets your coding agent find those functions, capture a baseline, and show what changed after a patch. One service handles multiple checkouts. TypeScript, TSX and Swift work out of the box, with optional packs for other languages.
 
-**Read the two scores in opposite directions.** Lower raw CRAP means lower estimated change risk. In the dashboard, `94.51 / 30` means a function scored 94.51 against a review threshold of 30. Raw CRAP has no fixed maximum. The separate **session grade** runs up to **10/10**, with higher grades indicating healthier changed functions. [Scoring details](#what-the-numbers-mean)
+| Score | How to read it | Where to start |
+| --- | --- | --- |
+| Function CRAP | Lower is better. A value of 94.51 against a threshold of 30 calls for review. | [Function risk and coverage](#what-the-numbers-mean) |
+| Session health | Higher is better, up to 10. Each changed function contributes complexity, nesting, CRAP and coverage evidence. | [Session review](#see-the-crap-session-review-in-chat) |
+| Application security | Higher is better, up to 100. Each enabled OWASP-mapped source match carries a penalty. | [Security checks](#application-security) |
+| Accessibility | Higher is better, up to 100. The report counts known passes and failures and lists pending checks. | [WCAG and Revised Section 508 checks](#accessibility-and-color-vision) |
+| Colorblind | Higher is better, up to 100. Each measured pair must meet its contrast target in all three color vision simulations to earn a pass. | [Contrast and color vision](#accessibility-and-color-vision) |
 
 Original code and documentation are available under the [MIT license](LICENSE). See the [contributing guide](CONTRIBUTING.md) for local setup and pull requests, and [third-party notices](THIRD_PARTY_NOTICES.md) for vendored components and language packs.
 
@@ -41,17 +49,17 @@ The last step runs Oxlint, builds the server, records coverage from passing test
 
 ## Install once for all your projects (macOS)
 
-From one copy of this repository, run `npm run install:machine`. You need Node.js 24.12+, npm, Git, and Python 3. The installer detects Codex, Claude Code and OpenCode on PATH. The installer builds a private runtime under `~/.local/share/crap-mcp`, starts one per-user launchd service at login, connects detected clients to the same HTTP endpoint, and links both CRAP skills in the user skill directories. Rerun the installer from an updated checkout to upgrade. Target projects need no copy of this server, dependencies or Codex config. If a project has an old project-local `crap_score` stdio override, remove that override to use the machine connection.
+From one copy of this repository, run `npm run install:machine`. You need Node.js 24.12+, npm, Git, and Python 3. The installer detects Codex, Claude Code and OpenCode on PATH. The installer builds a private runtime under `~/.local/share/crap-mcp`, starts one per-user launchd service at login, connects detected clients to the same HTTP endpoint, and links the CRAP, security and accessibility skills in the user skill directories. Rerun the installer from an updated checkout to upgrade. Target projects need no copy of this server, dependencies or Codex config. If a project has an old project-local `crap_score` stdio override, remove that override to use the machine connection.
 
-Use the same two skills in each harness. In Claude Code run `/crap-development-review` or `/crap-backlog-triage`. In OpenCode ask “Use the crap-development-review skill on this checkout.” In Codex use `$crap-development-review`. The installer links one canonical copy into `~/.agents/skills` and Claude Code’s `~/.claude/skills` (or `CLAUDE_CONFIG_DIR/skills`). OpenCode also discovers the shared agents directory. If you install another client later, run `bash ~/.local/share/crap-mcp/current/scripts/connect-clients.sh`. For a foreground service, point each client's HTTP MCP entry at its `/mcp` endpoint and install the two skill folders in that client’s supported skill directory.
+Use the same skills in each harness. In Claude Code run `/crap-development-review` or `/crap-backlog-triage`. In OpenCode ask “Use the crap-development-review skill on this checkout.” In Codex use `$crap-development-review`. The installer links one canonical copy into `~/.agents/skills` and Claude Code’s `~/.claude/skills` (or `CLAUDE_CONFIG_DIR/skills`). OpenCode also discovers the shared agents directory. If you install another client later, run `bash ~/.local/share/crap-mcp/current/scripts/connect-clients.sh`. For a foreground service, point each client's HTTP MCP entry at its `/mcp` endpoint and install the skill folders in that client’s supported skill directory.
 
-At the end of a review the skill requests `review_changes` with `format:"chat", scorecard:true`. This returns the session score, an inline PNG and its local path. Codex desktop can embed the file in the agent reply. Other MCP clients can render the image or relay the text and report link. The QA and benchmark badges refer to the check matching the reviewed inputs.
+At the end of a development review the skill requests `review_changes` with `format:"chat", scorecard:true`. This returns the session score, a standalone HTML finding report, an inline PNG and its local path. Codex desktop can embed the file in the agent reply. Other MCP clients can render the image or relay the text and report link. The QA and benchmark badges refer to the check matching the reviewed inputs.
 
 Open a new Codex chat in a trusted Git checkout and ask **“Use $crap-development-review on this change”** or **“Use $crap-backlog-triage in this project.”** The skill calls `register_project` with the checkout path. Registration returns a stable ID for that path. Every subsequent analysis call supplies that ID, so concurrent chats and linked worktrees keep separate targets. The picker at [the local dashboard](http://127.0.0.1:47731/) lists the registered checkout paths and loads the selected project's current report. Reload to discover newly registered projects. For a task comparison, open `/?project=<id>&snapshot=<starting-snapshot>`.
 
 Structural findings work immediately for TypeScript, TSX and Swift. For numeric CRAP scores, configure each project's coverage command and record its passing suite (below). The installed recorder is at `~/.local/share/crap-mcp/current/dist/record.js`. Registering a project writes its path to the local catalog and saves analysis under its Git directory. The machine service listens only on loopback and is intended for a trusted single-user workstation. Local processes can access registered reports and register checkouts. The browser cannot register a project through the picker.
 
-For other platforms or development, run `npm ci && npm run machine` in one server checkout, then run `codex mcp add crap_score --url http://127.0.0.1:47731/mcp` and install the two skill folders in your user skills directory. The foreground service uses the same catalog and API. `CRAP_PORT` and `CRAP_DATA_DIR` override the foreground defaults.
+For other platforms or development, run `npm ci && npm run machine` in one server checkout, then run `codex mcp add crap_score --url http://127.0.0.1:47731/mcp` and install the skill folders in your user skills directory. The foreground service uses the same catalog and API. `CRAP_PORT` and `CRAP_DATA_DIR` override the foreground defaults.
 
 ## Project settings, checks and agent feedback
 
@@ -61,7 +69,7 @@ For checkout-specific directory omissions, enter one literal path per line under
 
 For a rule unique to your project, enable a catalog rule in settings or add a custom rule to the project's linter configuration and run that linter through `.crap.json`'s `checks` array. The project check history records the command's exit status.
 
-Both skills probe the service before use and start the installed launch agent when it is offline. They register the current checkout, read its recent results, enable any required optional parser, then capture a baseline. Development review records each attempted change and reruns the checks. Backlog triage records the starting evidence and uses earlier outcomes when choosing a task. Example: **“Use $crap-development-review, enable Python for this project, and check my change.”**
+The development-review and backlog-triage skills probe the service before use and start the installed launch agent when it is offline. They register the current checkout, read its recent results, enable any required optional parser, then capture a baseline. Development review records each attempted change and reruns the checks. Backlog triage records the starting evidence and uses earlier outcomes when choosing a task. Example: **“Use $crap-development-review, enable Python for this project, and check my change.”**
 
 From the target checkout, run the same workflow manually:
 
@@ -116,7 +124,50 @@ The machine tools `get_project_settings({project})` and `set_project_language({p
 
 After running the suite, run `npm run dashboard` and open **.crap-local/dashboard.html** in a browser. The file works offline. Search functions by name or path, filter for hotspots or missing evidence, and expand a function for its uncovered lines and findings. The report includes the suite and snapshot, skipped files, and the diff against HEAD. For another checkout, use `npm run dashboard -- /absolute/path/to/repo`; set `CRAP_BASE` to compare with a different revision. Each successful CI run attaches this repo’s HTML report as the **repository-health** artifact. A generated report is a snapshot: rerun the command after code or coverage changes.
 
-## See the session review in chat
+## Reading a finding
+
+Open a finding in the dashboard to see its file and line range, numbered source excerpt, the observation that triggered the rule, its possible impact, its effect on the score, a suggested change, and a way to verify the change. The session breakdown shows the four scoring inputs for each changed function. Accessibility separates failed, pending and passed checks. Color evidence lists each measured ratio and simulation verdict, including user-configured palette entries.
+
+Chat reviews return a **Detailed report** path alongside the summary. This standalone HTML file includes the evidence used for that score. For a past run, open **Project settings → Recent checks → Open findings for this check**. A resolved finding shows its baseline location and excerpt. Older snapshots can have line references and aggregate counts only. Excerpts contain local application source and are included in an exported HTML report.
+
+For example, ordinary red text (`#f00`) on black (`#000`) measures 5.252:1 against the 4.5:1 text target. Under the protanopia simulation it measures 3.285:1. Open the color pair to see both results and the suggested repair. Increasing the lightness of the text can improve contrast. If the colors convey status, add a label or icon and verify the state in the running interface.
+
+## Application security
+
+Use `$crap-security-review` for a separate application security assessment. In Settings → Application security select the checks for this checkout. Project checks record a separate security score and evidence counts. An optional minimum score makes a low score fail and an unrated scan incomplete. Leave it blank for report-only mode. The **Source security** dashboard section and the security chat card use the same findings, independent of coverage and CRAP.
+
+AppSec v1 is a local source-review rubric. It starts at 100 and deducts **25 per high** and **10 per medium** occurrence (floor 0). A direct eval and a weak hash, for example, score 65/100. Compare the same checkout under the same policy; counts and locations remain available even at zero. The [OWASP Top 10:2025](https://owasp.org/Top10/2025/) supplies categories, not these weights or an application grade.
+
+| Source pattern | Language | OWASP category | Severity |
+|---|---|---|---|
+| Direct `eval` or `globalThis.eval` call | JS/TS, including JSX/TSX | A05 Injection | High |
+| SQL template with substitutions passed directly to a query or execute method | JS/TS, including JSX/TSX | A05 Injection | High |
+| Literal `rejectUnauthorized: false` option | JS/TS, including JSX/TSX | [A07 Authentication Failures (CWE-295)](https://top10.owasp.org/2025/A07_2025-Authentication_Failures/) | High |
+| MD5/SHA-1 via common Node, CommonCrypto, or CryptoKit digest calls | JS/TS, Swift | A04 Cryptographic Failures | Medium |
+| `SecTrustSetExceptions` call | Swift | [A07 Authentication Failures (CWE-295)](https://top10.owasp.org/2025/A07_2025-Authentication_Failures/) | High |
+
+The parser inspects syntax, including top-level code; comments and ordinary string contents do not trigger rules. Matches need human review: names can be shadowed and a checksum need not be a security control. The scanner does not trace data flow, resolve aliases, audit dependencies or verify authorization, runtime settings or other OWASP categories. Git-visible files use the project's analysis exclusions and directory omissions. Recognized application file types without a rule, unsafe or unparseable files, or no assessable files leave the score **unrated**. Other assets are outside the scan.
+
+Use `scan_application_security` before editing. Pass its **security** snapshot to `review_application_security` afterwards, or supply a Git ref as `base` (defaults to HEAD). A saved baseline supports dirty worktrees and uses the original policy; Git comparisons apply today's rules to both sides. Matching uses file, rule, syntax text and duplicate occurrence; moved lines match, while renamed files and rewritten expressions may appear as separate changes. Request `format:"chat", scorecard:true` on either tool for a PNG. In data format all result lists support `offset` and `limit`; pin the scan's `snapshot` or a review's `current` when paging. The dashboard compares against HEAD by default. The machine dashboard accepts `securitySnapshot=<starting-id>`; for an offline report run `SECURITY_SNAPSHOT=<starting-id> npm run dashboard`.
+
+## Accessibility and color vision
+
+Use `$crap-accessibility-review` to capture a baseline and review a patch. The dashboard, offline report and chat card show two local scores. Settings → Accessibility controls the rules, optional minimum scores and named palette pairs. Leaving a minimum blank records that result for reporting. When a minimum is set, a measured score below it fails the check. An unrated result or pending reviews for a score that otherwise meets its minimum leave the check incomplete.
+
+| Score | Calculation | Evidence |
+| --- | --- | --- |
+| Accessibility | Round down 100 × passed / (passed + failed) | Each applicable source check on an element counts once. Pending checks appear alongside the measured denominator. |
+| Colorblind | Round down 100 × pairs meeting the target in all three simulations / measured pairs | Each measured text occurrence or named palette pair counts once. The report shows the original ratio, threshold and each simulated ratio. |
+
+A score requires at least one measurement and a scan without skipped files. The tools report the accessible names of buttons and frames, image alternatives, a page language declaration, explicit button labels that match visible text, viewport zoom restrictions, explicit SwiftUI accessibility labels, and modeled text contrast. The check for label in name maps to WCAG 2.1 and 2.2. Revised Section 508 incorporates WCAG 2.0 A and AA for covered electronic content and software. The catalog identifies the relevant criteria for each check. Keyboard operation, focus, reading order, meaningful alternatives, and communicating status by more than color require verification in the running interface. [WCAG 2.2](https://www.w3.org/TR/WCAG22/) · [Revised Section 508](https://www.access-board.gov/508/) · [W3C Accessibility Conformance Testing](https://www.w3.org/WAI/standards-guidelines/act/)
+
+Text contrast uses sRGB relative luminance. Normal text needs 4.5:1. Text at least 24 CSS pixels or bold text at least 18⅔ CSS pixels needs 3:1. Decisions use the unrounded ratio. HTML checks read local stylesheets, style elements, inline CSS and ancestor backgrounds in a static, light-canvas DOM. JSX and TSX checks can measure explicit opaque hex colors with a literal font size. Runtime themes, remote stylesheets, unsupported paints and native SwiftUI text colors need rendered verification. The scanner analyzes authored source. Overlays, generated content, interaction states and actual screen pixels are outside that measurement. [WCAG contrast guidance](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum)
+
+The colorblind score applies the Machado, Oliveira and Fernandes severity-1.0 matrices in linear sRGB to simulate protanopia, deuteranopia and tritanopia. Text retains its normal or large-text threshold. You can also enter meaningful color pairs in Settings, for example `#2e7d32 #c62828 Approved / declined`. Their local 3:1 target helps prioritize color combinations for review. Verify labels, icons or patterns independently. For a pair sampled from a running interface, call `analyze_accessibility_color_pair` with two hex colors and `usage` set to `text`, `large-text` or `ui-boundary`. [Simulation model and matrices](https://www.inf.ufrgs.br/~oliveira/pubs_files/CVD_Simulation/CVD_Simulation.html) · [WCAG use of color](https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html)
+
+Use `scan_application_accessibility` before editing and pass its accessibility snapshot to `review_application_accessibility`. A Git `base` uses the current settings for both revisions. Capture a snapshot to preserve a dirty worktree or earlier palette. Pin `current` when paging a review. Pending outcomes for the same file and rule prevent confirmation of a changed finding. Request `format:"chat", scorecard:true` on either tool for the card. Use `accessibilitySnapshot=<starting-id>` on the machine dashboard or `ACCESSIBILITY_SNAPSHOT=<starting-id> npm run dashboard` for the offline report.
+
+## See the CRAP session review in chat
 
 Before editing, keep the worktree snapshot ID from `scan_repository_hotspots`. At completion the project instructions and development-review skill ask the agent to call `review_changes` with `{"snapshot":"<start-id>","format":"chat"}` and relay the result in the current conversation. The MCP server returns tool results to its caller; it does not send unsolicited messages into a chat. From the shell, `npm run summary -- --snapshot <start-id>` prints the same result. Use `--base <revision>` for a commit comparison. Pass `CRAP_SNAPSHOT=<start-id> npm run dashboard` to display that same session in the dashboard. Without a starting snapshot or revision override, a clean comparison with HEAD has no work to rate.
 
@@ -147,13 +198,20 @@ The machine install above is the usual Codex setup. For a host that only support
 }
 ```
 
-For Codex use the equivalent `[mcp_servers.crap_score]` table in the target's `.codex/config.toml` ([OpenAI MCP documentation](https://developers.openai.com/codex/mcp)). Copy the two skill directories into that project's `.agents/skills/` or the chosen agent's skills directory. For a smoke test here, inspect `src/coverage.ts`, symbol `score`, then call `review_changes` with `{"base":"HEAD"}`. A clean checkout should have no affected functions.
+For Codex use the equivalent `[mcp_servers.crap_score]` table in the target's `.codex/config.toml` ([OpenAI MCP documentation](https://developers.openai.com/codex/mcp)). Copy the skill directories into that project's `.agents/skills/` or the chosen agent's skills directory. For a smoke test here, inspect `src/coverage.ts`, symbol `score`, then call `review_changes` with `{"base":"HEAD"}`. A clean checkout should have no affected functions.
+
+For the machine service, add the `project` ID returned by `register_project` to each example. The stdio server already has its target checkout.
 
 | Tool | Example arguments | Result |
 | --- | --- | --- |
 | `analyze_function_health` | `{"file":"src/coverage.ts","symbol":"score"}` | Qualified symbol and line range, complexity, nesting, measured/uncovered lines, score, findings and checks. Use a one-based `line` instead of a name to select the innermost function. |
 | `scan_repository_hotspots` | `{"rule":"crap","priority":"churn","limit":10}` | Ranked items, scan progress, skips, snapshot and pagination. Filter by path prefix, rule or coverage (including `unscored`). Order by score, critical paths or file commits over 90 days. |
 | `get_repository_report` | `{"limit":100}` | All assessed functions, including acceptable and unscored ones. Pass the first snapshot ID on subsequent pages. The reporting dashboard uses this tool. |
+| `scan_application_security` | `{"limit":20}` | Independent security score, enabled rule catalog, findings and skipped files. Save the security snapshot for a comparison. |
+| `review_application_security` | `{"snapshot":"<security snapshot>","format":"chat","scorecard":true}` | Before/after security score, evidence counts, an HTML finding report and a separate PNG card. Use data format for finding changes. |
+| `scan_application_accessibility` | `{"limit":20}` | Accessibility and colorblind scores, findings, passed checks, pending checks, color pairs and skipped files. Save the accessibility snapshot to page through the evidence. |
+| `review_application_accessibility` | `{"snapshot":"<accessibility snapshot>","format":"chat","scorecard":true}` | Score changes, evidence counts, an HTML finding report and a PNG card. Data format includes introduced and resolved findings and baseline color pairs. |
+| `analyze_accessibility_color_pair` | `{"foreground":"#f00","background":"#000","usage":"text"}` | Ordinary contrast, the target, three simulated ratios and the pair’s colorblind score. Use `large-text` for large text or `ui-boundary` for a meaningful boundary. |
 | `review_changes` | `{"snapshot":"<starting snapshot id>","findingId":"<optional selected id>"}` | New, worsened, resolved, unknown, improved and pre-existing findings for affected symbols, with before/after evidence. Use `base` for a Git revision instead of a saved snapshot. |
 
 Capture a worktree snapshot before editing if uncommitted changes exist. A review compares the final working source (including nonignored, untracked files) against that starting state. An unchanged selected finding can also be followed through a test-only edit. Pages use zero-based `offset` and `limit` (1–100); follow each collection's `nextOffset`. A scan starts at launch, rechecks inputs on query, and accepts `{"refresh":true}` for a background refresh. Findings include the rule, evidence, suggested action and completion check.
