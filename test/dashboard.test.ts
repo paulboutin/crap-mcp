@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { JSDOM } from "jsdom";
 import { renderReport, type Report } from "../src/report-view.ts";
-import { health, findings } from "../src/findings.ts";
+import { functionExplanation, health, findings } from "../src/findings.ts";
 import { parse } from "../src/syntax.ts";
 
 test("offline dashboard distinguishes risk from unscored, pages and filters, and renders repository strings as text", () => {
@@ -35,7 +35,14 @@ test("offline dashboard distinguishes risk from unscored, pages and filters, and
       i === 1 ? undefined : run,
     );
 
-    return { ...h, findings: findings(h) };
+    return {
+      ...h,
+      findings: findings(h),
+      detail: {
+        ...functionExplanation(h),
+        scoring: "Previously saved generic formula",
+      },
+    };
   });
 
   const base: Report = {
@@ -110,6 +117,11 @@ test("offline dashboard distinguishes risk from unscored, pages and filters, and
   assert.equal(inspection.hidden, false);
   assert.equal(inspection.querySelector("td")!.colSpan, cells.length);
   assert.match(inspection.textContent!, /How to address it/);
+  assert.match(inspection.textContent!, /coverage gap adds 121 points/);
+  assert.doesNotMatch(
+    inspection.textContent!,
+    /Previously saved generic formula/,
+  );
   assert.equal(toggle.getAttribute("aria-expanded"), "true");
   toggle.click();
   assert.equal(inspection.hidden, true);

@@ -145,6 +145,4 @@ export function evidence(
   return rows ? measured(rows, r, run.functions?.[file]) : absent("missing");
 }
 
-export function score(complexity: number, percent: number) {
-  return complexity ** 2 * (1 - percent / 100) ** 3 + complexity;
-}
+export { score } from "./crap-score.ts";

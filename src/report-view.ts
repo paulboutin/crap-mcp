@@ -1,4 +1,5 @@
-// Shipped as a standalone ES module in the offline report. Keep imports type-only.
+// Runtime imports must also be embedded by report-html for offline use.
+import { scoreEffect } from "./crap-score.ts";
 import type { Health, Finding } from "./findings.ts";
 import type { Delta } from "./review.ts";
 import type { Snapshot } from "./scan.ts";
@@ -302,10 +303,20 @@ function describe(doc: Document, h: Row) {
     );
 
   if (h.detail)
-    group.append(findingDetails(doc, "How this function scored", h.detail));
+    group.append(
+      findingDetails(doc, "How this function scored", {
+        ...h.detail,
+        scoring: scoreEffect(h),
+      }),
+    );
 
   for (const f of h.findings)
-    group.append(findingDetails(doc, f.rule + " · " + f.value, f.detail));
+    group.append(
+      findingDetails(doc, f.rule + " · " + f.value, {
+        ...f.detail,
+        scoring: scoreEffect(h, f.rule),
+      }),
+    );
 
   return group;
 }

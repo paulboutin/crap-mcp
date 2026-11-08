@@ -6,7 +6,7 @@ Use the [agent skills](index.md) for a normal review. For a custom client or scr
 
 | Tool | Example arguments | Result |
 | --- | --- | --- |
-| `analyze_function_health` | `{"file":"src/coverage.ts","symbol":"score"}` | Qualified symbol and line range, complexity, nesting, measured/uncovered lines, score, findings and checks. Use a one-based `line` instead of a name to select the innermost function. |
+| `analyze_function_health` | `{"file":"src/crap-score.ts","symbol":"score"}` | Qualified symbol and line range, complexity, nesting, measured/uncovered lines, score, findings and checks. Use a one-based `line` instead of a name to select the innermost function. |
 | `scan_repository_hotspots` | `{"rule":"crap","priority":"churn","limit":10}` | Ranked items, scan progress, skips, snapshot and pagination. Filter by path prefix, rule or coverage (including `unscored`). Order by score, critical paths or file commits over 90 days. |
 | `get_repository_report` | `{"limit":100}` | All assessed functions, including acceptable and unscored ones. Pass the first snapshot ID on subsequent pages. The reporting dashboard uses this tool. |
 | `scan_application_security` | `{"limit":20}` | Independent security score, enabled rule catalog, findings and skipped files. Save the security snapshot for a comparison. |

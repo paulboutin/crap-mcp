@@ -29,7 +29,12 @@ export function reportDocument(json: string) {
       '<link rel="stylesheet" href="style.css" />',
       () => "<style>" + asset("../dashboard/style.css") + "</style>",
     )
-    .replace("/* REPORT_JS */", () => asset("../dist/report-view.js"))
+    .replace("/* REPORT_JS */", () =>
+      asset("../dist/report-view.js").replace(
+        'import { scoreEffect } from "./crap-score.js";',
+        () => asset("../dist/crap-score.js"),
+      ),
+    )
     .replace("REPORT_PAYLOAD", () => data);
 }
 

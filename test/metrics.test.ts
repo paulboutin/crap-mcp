@@ -2,7 +2,7 @@ import { functionHits } from "../src/function-hits.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parse } from "../src/syntax.ts";
-import { health, findings } from "../src/findings.ts";
+import { functionExplanation, health, findings } from "../src/findings.ts";
 import { evidence, score, type Receipt } from "../src/coverage.ts";
 import { lcov, istanbul, xcJson } from "../src/importers.ts";
 import { lookup } from "../src/backlog.ts";
@@ -233,4 +233,76 @@ test("LCOV callback counters distinguish an uncalled callback from its executed 
     "shared-line",
   );
   assert.equal(evidence(r, "a.ts", "other", "unit", hit).status, "stale");
+});
+
+test("score explanations separate measured contributions, coverage targets and structural findings", () => {
+  const routine = parse("a.ts", "function check() { return 0; }")[0];
+
+  function sample(complexity: number, covered: number, total: number) {
+    const lines: [number, number][] = Array.from({ length: total }, (_, i) => [
+      i + 1,
+      Number(i < covered),
+    ]);
+
+    return health(
+      { ...routine, end: total, complexity, depth: 4 },
+      "a.ts",
+      "s",
+      "unit",
+      {
+        snapshot: "s",
+        suite: "unit",
+        at: "now",
+        run: "r",
+        files: { "a.ts": lines },
+      },
+    );
+  }
+
+  const measured = sample(16, 5, 10);
+  const explanation = functionExplanation(measured).scoring;
+  assert.match(explanation, /5 of 10 measured lines/);
+  assert.match(
+    explanation,
+    /32 points above the complexity of 16, bringing CRAP to 48/,
+  );
+  assert.match(explanation, /2 more measured lines \(7\/10\)/);
+  const entries = findings(measured);
+  assert.match(
+    entries.find((f) => f.rule === "complexity")!.detail.scoring,
+    /from 48 to 43.13/,
+  );
+  assert.match(
+    entries.find((f) => f.rule === "nesting")!.detail.scoring,
+    /depth of 4 adds no points/,
+  );
+  assert.match(
+    functionExplanation(sample(31, 5, 10)).scoring,
+    /full measured coverage, CRAP would be 31/,
+  );
+  assert.match(
+    functionExplanation(sample(31, 10, 10)).scoring,
+    /entire CRAP score of 31/,
+  );
+  assert.match(
+    functionExplanation(sample(30, 9, 10)).scoring,
+    /1 more measured line \(10\/10\)/,
+  );
+  assert.match(
+    functionExplanation(sample(5, 0, 5)).scoring,
+    /25 points above the complexity of 5, bringing CRAP to 30\.$/,
+  );
+  const near = sample(30, 999, 1000);
+  assert.match(
+    functionExplanation(near).scoring,
+    /less than 0.01 points.*just over 30/,
+  );
+  const missing = health(routine, "a.ts", "s", "unit");
+  assert.match(functionExplanation(missing).scoring, /no coverage.*unknown/);
+  const callback = sample(6, 0, 1);
+  callback.coverage.basis = "function-entry";
+  assert.match(
+    functionExplanation(callback).scoring,
+    /did not enter this callback.*would fall to 6/,
+  );
 });
