@@ -21,6 +21,6 @@ Suppose a query passes a template string containing a user-supplied ID directly 
 
 ## Return to the evidence
 
-A chat review returns a **Detailed report** path to a standalone HTML file. A requested scorecard shows the summary as a PNG. In the dashboard, choose **Project settings → Recent checks → Open findings for this check** to inspect a recorded run. Older snapshots may have line references or aggregate counts only.
+The Markdown chat card links to a standalone HTML file under **Detailed report**. Request a PNG export with `scorecard:true` when you need an image. In the dashboard, choose **Project settings → Recent checks → Open findings for this check** to inspect a recorded run. Older snapshots may have line references or aggregate counts only.
 
 To generate an offline dashboard, run `npm run dashboard -- /absolute/path/to/checkout` from the server clone. Open `.crap-local/dashboard.html` in the target checkout. Exported reports can contain excerpts of the source being assessed.

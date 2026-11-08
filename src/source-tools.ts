@@ -1,3 +1,4 @@
+import type { CardFormat } from "./markdown-card.ts";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
@@ -13,6 +14,7 @@ interface SourceOperations<S> {
     directory: string,
     card: boolean,
     now: S,
+    format: CardFormat,
     before?: S,
   ): Promise<CallToolResult>;
 }
@@ -30,7 +32,7 @@ export function sourceTools<S>(
   scope: { project: z.ZodString | z.ZodOptional<z.ZodNever> },
 ) {
   const presentation = {
-    format: z.enum(["data", "chat"]).default("data"),
+    format: z.enum(["data", "chat", "markdown"]).default("data"),
     scorecard: z.boolean().default(false),
   };
 
@@ -48,7 +50,8 @@ export function sourceTools<S>(
 
       const now = q.snapshot ? ops.load(repo, q.snapshot) : ops.scan(repo);
 
-      if (q.format === "chat") return ops.chat(repo.local, q.scorecard, now);
+      if (q.format !== "data")
+        return ops.chat(repo.local, q.scorecard, now, q.format);
       const result = ops.data(q.offset, q.limit, now);
 
       return { content: [{ type: "text", text: JSON.stringify(result) }] };
@@ -60,7 +63,7 @@ export function sourceTools<S>(
       description:
         "Compare application " +
         name +
-        " with its starting snapshot or a Git ref (default HEAD). Use chat and scorecard for the PNG.",
+        " with its starting snapshot or a Git ref (default HEAD). Use markdown for a text scorecard. Set scorecard:true to also export a PNG.",
       inputSchema: z.object({
         ...scope,
         ...page,
@@ -81,8 +84,8 @@ export function sourceTools<S>(
 
       const now = q.current ? ops.load(repo, q.current) : ops.scan(repo);
 
-      if (q.format === "chat")
-        return ops.chat(repo.local, q.scorecard, now, before);
+      if (q.format !== "data")
+        return ops.chat(repo.local, q.scorecard, now, q.format, before);
 
       return {
         content: [

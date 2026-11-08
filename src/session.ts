@@ -138,6 +138,7 @@ export function sessionSummary(result: Review) {
     total: t.total,
     removed: t.removed,
     examples,
+    changes,
     chat: [
       "Session health: " + score,
       t.measured +

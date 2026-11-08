@@ -13,4 +13,6 @@ For example, a function meeting the first three criteria with 80% coverage earns
 
 Open **Score by changed function** to see each contribution. QA replay results and benchmark timings appear alongside the grade when recorded. Use their own results to assess behavior and performance.
 
-![Example session scorecard showing 10 out of 10 for the measured HTTP-status cleanup](../images/http-status-scorecard.png)
+The in-chat card uses Markdown. Ask for a PNG when you need an image to share.
+
+![Example exported session scorecard showing 10 out of 10 for the measured HTTP-status cleanup](../images/http-status-scorecard.png)

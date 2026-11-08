@@ -1,3 +1,4 @@
+import { artifactLink, sessionMarkdown } from "../src/markdown-card.ts";
 import { findMarkedTicket } from "../src/github.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -84,4 +85,46 @@ test("recovery finds the exact marker across GitHub result pages and rejects men
 
   assert.equal(findMarkedTicket(pages, "<!-- id -->")?.number, 5);
   assert.equal(findMarkedTicket(pages, "<!-- other -->"), undefined);
+});
+
+test("Markdown keeps missing evidence explicit and repository text literal", () => {
+  const none = sessionSummary({ ...clean, affected: [] });
+
+  const mixed = sessionSummary({
+    ...clean,
+    affected: [
+      { before: null, after: good },
+      { before: null, after: absent },
+    ],
+  });
+
+  const missing = sessionSummary({
+    ...clean,
+    affected: [{ before: null, after: absent }],
+  });
+
+  for (const [summary, marker] of [
+    [none, "⚪"],
+    [mixed, "🟡"],
+    [missing, "⚪"],
+  ] as const) {
+    const card = sessionMarkdown(
+      summary,
+      0,
+      undefined,
+      ["test `name`\n\x1b[31m**failed**"],
+      "unit",
+    );
+
+    assert.ok(
+      card.startsWith(marker + " **Session health · " + summary.rating + "**"),
+    );
+    assert.ok(card.includes("`` test `name` **failed** ``"));
+    assert.match(card, /Benchmarks:\*\* Unmeasured/);
+  }
+
+  assert.equal(
+    artifactLink("Report", "/reports/a (b)/#1.html"),
+    "[Report](/reports/a%20%28b%29/%231.html)",
+  );
 });

@@ -1,4 +1,9 @@
 import {
+  accessMarkdown,
+  artifactLink,
+  type CardFormat,
+} from "./markdown-card.ts";
+import {
   measurePair,
   survives,
   rgbHex,
@@ -37,7 +42,12 @@ function paged(r: AccessibilityReport, offset: number, limit: number) {
   };
 }
 
-async function chat(r: AccessibilityReport, dir: string, card: boolean) {
+async function chat(
+  r: AccessibilityReport,
+  dir: string,
+  card: boolean,
+  format: CardFormat,
+) {
   const color =
     "Colorblind score · " +
     (r.colorblind.score === null ? "Unrated" : r.colorblind.score + "/100") +
@@ -71,7 +81,12 @@ async function chat(r: AccessibilityReport, dir: string, card: boolean) {
     accessibility: r,
   });
 
-  message.text += "\nDetailed report: " + report;
+  message.text =
+    format === "markdown"
+      ? accessMarkdown(r, color) +
+        "\n\n" +
+        artifactLink("Detailed report", report)
+      : message.text + "\nDetailed report: " + report;
 
   if (!card) return { content: [message] };
 
@@ -84,7 +99,10 @@ async function chat(r: AccessibilityReport, dir: string, card: boolean) {
 
   const saved = await saveCard(dir, key, svg);
 
-  message.text += "\nScorecard: " + saved.path;
+  message.text +=
+    format === "markdown"
+      ? "\n\n" + artifactLink("PNG scorecard", saved.path)
+      : "\nScorecard: " + saved.path;
 
   return { content: [message, saved.image] };
 }
@@ -142,8 +160,8 @@ export function accessibilityTools(
       load: accessibilityBaseline,
       data: (offset, limit, now, before) =>
         paged(accessibilityReport(now, before), offset, limit),
-      chat: (dir, card, now, before) =>
-        chat(accessibilityReport(now, before), dir, card),
+      chat: (dir, card, now, format, before) =>
+        chat(accessibilityReport(now, before), dir, card, format),
     },
     server,
     select,
