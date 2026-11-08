@@ -92,6 +92,12 @@ test("language findings survive absent coverage and file-level matches, and the 
   filter.value = "patterns";
   filter.dispatchEvent(new doc.defaultView!.Event("change"));
   assert.match(doc.querySelector("#rows")!.textContent!, /Unscored/);
+
+  const toggle = [
+    ...doc.querySelectorAll<HTMLButtonElement>("#rows button"),
+  ].find((button) => button.textContent === inner.symbol)!;
+
+  toggle.click();
   assert.match(
     doc.querySelector("#rows")!.textContent!,
     /no-floating-promises/,
