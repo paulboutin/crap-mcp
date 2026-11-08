@@ -1,16 +1,31 @@
 # CRAP Score MCP
 
-**CRAP stands for Change Risk Anti-Patterns.** It estimates how risky a function is to change by combining the number of paths through its code (cyclomatic complexity) with how much of that code your tests execute. A function with many paths and little coverage is a good place to add a test before editing. [Background from the metric’s co-creator](https://testing.googleblog.com/2011/02/this-code-is-crap.html)
+Use **agent skills** to review a Git checkout for **code quality, OWASP-mapped application security, WCAG and Section 508 accessibility, and color vision**. The skills run a local MCP server and bring the results back into your coding session, with source lines, scorecards and detailed finding reports.
 
-This local **Model Context Protocol (MCP)** server lets your coding agent find those functions, capture a baseline, and show what changed after a patch. One service handles multiple checkouts. TypeScript, TSX and Swift work out of the box, with optional packs for other languages.
+**[Open the documentation](https://paulboutin.github.io/crap-mcp/)** · [Install and connect](https://paulboutin.github.io/crap-mcp/getting-started/)
+
+## Choose an agent skill
+
+After installation, open your project in your coding agent and give it one of these prompts.
+
+| What you want to do | Try in Codex | Guide |
+| --- | --- | --- |
+| Review a patch for change risk | `Use $crap-development-review to review my patch.` | [Development review](https://paulboutin.github.io/crap-mcp/skills/development-review/) |
+| Inspect application security | `Use $crap-security-review to assess this checkout.` | [Security review](https://paulboutin.github.io/crap-mcp/skills/security-review/) |
+| Check accessibility, contrast and color vision | `Use $crap-accessibility-review to check this UI.` | [Accessibility review](https://paulboutin.github.io/crap-mcp/skills/accessibility-review/) |
+| Pick a maintenance task | `Use $crap-backlog-triage to pick one cleanup.` | [Backlog triage](https://paulboutin.github.io/crap-mcp/skills/backlog-triage/) |
+
+In Claude Code, invoke the same skill with a slash, such as `/crap-security-review`. In OpenCode, ask “Use the crap-security-review skill on this checkout.”
+
+## The five scores
 
 | Score | How to read it | Where to start |
 | --- | --- | --- |
-| Function CRAP | Lower is better. A value of 94.51 against a threshold of 30 calls for review. | [Function risk and coverage](#what-the-numbers-mean) |
-| Session health | Higher is better, up to 10. Each changed function contributes complexity, nesting, CRAP and coverage evidence. | [Session review](#see-the-crap-session-review-in-chat) |
-| Application security | Higher is better, up to 100. Each enabled OWASP-mapped source match carries a penalty. | [Security checks](#application-security) |
-| Accessibility | Higher is better, up to 100. The report counts known passes and failures and lists pending checks. | [WCAG and Revised Section 508 checks](#accessibility-and-color-vision) |
-| Colorblind | Higher is better, up to 100. Each measured pair must meet its contrast target in all three color vision simulations to earn a pass. | [Contrast and color vision](#accessibility-and-color-vision) |
+| Function CRAP | Lower is better. A value of 94.51 against a threshold of 30 calls for review. | [Function CRAP guide](https://paulboutin.github.io/crap-mcp/scores/function-crap/) |
+| Session health | Higher is better, up to 10. Each changed function contributes complexity, nesting, CRAP and coverage evidence. | [Session health guide](https://paulboutin.github.io/crap-mcp/scores/session-health/) |
+| Application security | Higher is better, up to 100. Each enabled OWASP-mapped source match carries a penalty. | [Security score guide](https://paulboutin.github.io/crap-mcp/scores/security/) |
+| Accessibility | Higher is better, up to 100. The report counts known passes and failures and lists pending checks. | [Accessibility score guide](https://paulboutin.github.io/crap-mcp/scores/accessibility/) |
+| Colorblind | Higher is better, up to 100. Each measured pair must meet its contrast target in all three color vision simulations to earn a pass. | [Colorblind score guide](https://paulboutin.github.io/crap-mcp/scores/colorblind/) |
 
 Original code and documentation are available under the [MIT license](LICENSE). See the [contributing guide](CONTRIBUTING.md) for local setup and pull requests, and [third-party notices](THIRD_PARTY_NOTICES.md) for vendored components and language packs.
 
@@ -241,6 +256,8 @@ Supported coverage inputs are LCOV with `DA` records, Istanbul/Jest `coverage-fi
 A passing run must produce a new report and the same source fingerprint before and after. The receipt records the designated suite, run ID, timestamp, source fingerprint and line counts. Inputs include supported source and test files, JS/JSON configuration, lockfiles and Swift package manifests. This is local evidence, not a hermetic build attestation: ignore generated outputs, include meaningful test inputs in version control, and rerun after environment or external-fixture changes. Targeted assertions can verify behavior without updating the comparable score.
 
 ## What the numbers mean
+
+CRAP stands for **Change Risk Anti-Patterns**. It estimates how risky a function is to change from its complexity and measured coverage. [Background from the metric’s co-creator](https://testing.googleblog.com/2011/02/this-code-is-crap.html)
 
 `CRAP = complexity² × (1 − covered / executable)³ + complexity`. Up to 30 is acceptable, above 30 through 60 is high, above 60 is critical. A function with complexity 16 and 12/24 lines covered scores 48. The server keeps the raw fraction for classification. Missing, stale, differently designated or insufficient evidence produces a null score.
 
