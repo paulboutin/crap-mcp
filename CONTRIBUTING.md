@@ -28,3 +28,15 @@ This runs lint, builds the server, measures the designated test suite, runs the 
 Target [the main branch](https://github.com/paulboutin/crap-mcp/pulls). Describe the behavior you changed, how to reproduce it, and which checks passed. For a scoring change, include the starting and ending raw CRAP score, measured coverage and any unscored functions. For a behavior or performance claim, include the corresponding replay or benchmark result. Report missing measurements explicitly.
 
 For a language pack, follow the [catalog guide](languages/README.md). When adding or updating third-party code or a parser, record the upstream version or commit, preserve its license and copyright notices, and update [third-party notices](THIRD_PARTY_NOTICES.md). Original contributions are provided under this project's [MIT license](LICENSE).
+
+## Preview the documentation
+
+The Markdown under `docs/` and navigation in `mkdocs.yml` build the GitHub Pages site. From the repository root, use an isolated Python 3.12 environment to preview a change.
+
+```sh
+python3 -m venv .crap-local/docs-venv
+.crap-local/docs-venv/bin/python -m pip install mkdocs-material==9.6.21
+.crap-local/docs-venv/bin/python -m mkdocs serve
+```
+
+Run `mkdocs build --strict` in that environment to check the published build. Documentation PRs run this check in CI. Merging a documentation change into `main` builds and deploys the site to GitHub Pages.

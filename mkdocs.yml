@@ -1,0 +1,42 @@
+site_name: CRAP Score MCP
+site_description: Use agent skills to review code quality, application security, accessibility and color vision.
+site_url: https://paulboutin.github.io/crap-mcp/
+repo_url: https://github.com/paulboutin/crap-mcp
+repo_name: paulboutin/crap-mcp
+site_dir: .crap-local/docs-site
+theme:
+  name: material
+  font: false
+  palette:
+    primary: teal
+    accent: teal
+  features:
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+markdown_extensions:
+  - tables
+  - attr_list
+  - md_in_html
+  - pymdownx.superfences
+extra_css:
+  - guide.css
+nav:
+  - Start with a skill: index.md
+  - Install and connect: getting-started.md
+  - Agent skills:
+      - Development review: skills/development-review.md
+      - Security review: skills/security-review.md
+      - Accessibility review: skills/accessibility-review.md
+      - Backlog triage: skills/backlog-triage.md
+  - Score guides:
+      - Function CRAP: scores/function-crap.md
+      - Session health: scores/session-health.md
+      - Application security: scores/security.md
+      - Accessibility: scores/accessibility.md
+      - Colorblind score: scores/colorblind.md
+  - Reports and settings:
+      - Read a finding: findings.md
+      - Configure a checkout: settings.md
+  - Reference:
+      - MCP tools: tools.md
