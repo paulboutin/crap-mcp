@@ -118,6 +118,9 @@
         const report = new URL("/report/" + select.value, location.origin);
         if (query.has("snapshot"))
           report.searchParams.set("snapshot", query.get("snapshot"));
+        if (query.has("accessibilitySnapshot")) report.searchParams.set("accessibilitySnapshot",query.get("accessibilitySnapshot"));
+        if (query.has("securitySnapshot"))
+          report.searchParams.set("securitySnapshot", query.get("securitySnapshot"));
         const settings = query.get("view") === "settings";
         const link = document.querySelector(settings ? "#back" : "#settings");
         const next = new URL(location.href);
@@ -145,6 +148,8 @@
         select.onchange = () => {
           query.set("project", select.value);
           query.delete("snapshot");
+          query.delete("securitySnapshot");
+          query.delete("accessibilitySnapshot");
           query.delete("view");
           location.search = query;
         };

@@ -1,3 +1,4 @@
+import type { FindingDetail } from "./finding-detail.ts";
 import { z } from "zod";
 import { digest } from "./files.ts";
 import { evidence, score, type Receipt } from "./coverage.ts";
@@ -20,6 +21,9 @@ export const healthSchema = z.object({
   start: z.number(),
   end: z.number(),
   hash: z.string(),
+  excerpt: z.string().optional(),
+  deepestExcerpt: z.string().optional(),
+  uncoveredExcerpt: z.string().optional(),
   complexity: z.number(),
   depth: z.number(),
   deepest: z.number(),
@@ -66,7 +70,18 @@ function band(n: number | null) {
 
 export type Rule = "crap" | "complexity" | "nesting" | "coverage";
 
+const impacts = {
+  crap: "Several paths share limited test evidence. A change that works on the common path can still break an untested outcome.",
+  complexity:
+    "Each decision adds a path a maintainer must reason about. Interacting branches make edge cases easier to miss.",
+  nesting:
+    "At the deepest branch, a reader must remember several enclosing conditions to understand when the code executes.",
+  coverage:
+    "The suite provides insufficient evidence to estimate change risk for this function. Its untested behavior is unknown.",
+};
+
 export interface Finding {
+  detail: FindingDetail;
   id: string;
   rule: Rule;
   value: number;
@@ -85,7 +100,41 @@ export function findings(h: Health) {
     action: string,
     check: string,
   ) {
-    rows.push({ id: h.id + ":" + rule, rule, value, reason, action, check });
+    const criteria = {
+      crap: "CRAP above 30 triggers a finding. Above 60 is critical.",
+      complexity: "Complexity of 10 or more triggers a structural finding.",
+      nesting: "Nesting depth of 4 or more triggers a structural finding.",
+      coverage: "Missing comparable coverage leaves CRAP unrated.",
+    };
+
+    const preview = {
+      crap: h.uncoveredExcerpt,
+      nesting: h.deepestExcerpt,
+      complexity: h.excerpt,
+      coverage: h.excerpt,
+    };
+
+    const detail = {
+      file: h.file,
+      line: h.start,
+      end: h.end,
+      excerpt: preview[rule] ?? h.excerpt,
+      why: reason,
+      impact: impacts[rule],
+      action,
+      check,
+      scoring: criteria[rule],
+    };
+
+    rows.push({
+      id: h.id + ":" + rule,
+      rule,
+      value,
+      reason,
+      action,
+      check,
+      detail,
+    });
   }
 
   if (h.score !== null && h.score > 30)
@@ -127,4 +176,43 @@ export function findings(h: Health) {
     );
 
   return rows;
+}
+
+export function functionExplanation(h: Health): FindingDetail {
+  return {
+    file: h.file,
+    line: h.start,
+    end: h.end,
+    excerpt: h.excerpt,
+    why:
+      h.complexity +
+      " independent paths, nesting depth " +
+      h.depth +
+      " (deepest at line " +
+      h.deepest +
+      "). " +
+      (h.coverage.percent === null
+        ? "Coverage is " + h.coverage.status + "."
+        : h.coverage.covered +
+          "/" +
+          h.coverage.executable +
+          " measured lines covered (" +
+          h.coverage.percent.toFixed(1) +
+          "%)."),
+    impact:
+      h.score === null
+        ? impacts.coverage
+        : h.score > 30
+          ? impacts.crap
+          : "The measured change risk is within the CRAP threshold. Inspect uncovered behavior and structural findings when changing this function.",
+    scoring:
+      "CRAP = complexity² × (1 − coverage fraction)³ + complexity. Lower scores indicate less measured change risk.",
+    action: h.coverage.uncovered.length
+      ? "Exercise a behavior that reaches uncovered lines " +
+        h.coverage.uncovered.join(", ") +
+        "."
+      : "Keep branch outcomes independently testable and preserve behavior when editing this function.",
+    check:
+      "Rerun the designated suite and compare this function’s CRAP, complexity and coverage against its snapshot.",
+  };
 }

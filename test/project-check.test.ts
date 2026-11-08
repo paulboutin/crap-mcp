@@ -1,3 +1,6 @@
+import { JSDOM } from "jsdom";
+import { renderReport } from "../src/report-view.ts";
+import { checkReport } from "../src/check-report.ts";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
@@ -95,13 +98,47 @@ test("project checks retain real lint, suite and threshold failures for later co
 
   assert.equal(success.outcome, "passed");
   assert.equal(success.metrics?.worst, 1);
+  const current = qualityPolicy(repo);
+  updatePolicy(repo, {
+    revision: current.revision,
+    settings: { ...current.settings, minSecurityScore: 90 },
+  });
+  writeFileSync(
+    join(root, "generated-extra", "source.js"),
+    "export const options = { rejectUnauthorized: false };",
+  );
+  const insecure = await projectCheck(repository(root), "security target");
+  assert.equal(insecure.tests, "passed");
+  assert.equal(insecure.metrics?.worst, 1);
+  assert.equal(insecure.security?.score, 75);
+  assert.equal(insecure.outcome, "failed");
   config.command = [process.execPath, "-e", "process.exit(3)"];
   writeFileSync(join(root, ".crap.json"), JSON.stringify(config));
   const failed = await projectCheck(repository(root), "test failure");
   assert.equal(failed.tests, "failed");
   assert.equal(failed.metrics, null);
-  assert.equal(recentRuns(repo).length, 3);
+  assert.equal(recentRuns(repo).length, 4);
   assert.equal(recentRuns(repo)[0].note, "test failure");
+
+  const doc = new JSDOM(
+    readFileSync(
+      new URL("../dashboard/template.html", import.meta.url),
+      "utf8",
+    ),
+  ).window.document;
+
+  renderReport(doc, checkReport(repo, attempt.at));
+  assert.match(doc.querySelector("#target-count")!.textContent!, /1 functions/);
+  assert.match(
+    doc.querySelector("#target-findings")!.textContent!,
+    /below the configured minimum of 75%/,
+  );
+  assert.match(
+    doc.querySelector("#target-findings pre")!.textContent!,
+    /console.log/,
+  );
+  assert.equal(checkReport(repo, failed.at).code.data, undefined);
+  assert.throws(() => checkReport(repo, "unknown"), /Unknown/);
 });
 
 test("local catalog entries use a verified grammar and reject mismatched bytes", (t) => {

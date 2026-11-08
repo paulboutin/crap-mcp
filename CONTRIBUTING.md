@@ -2,6 +2,8 @@
 
 Use [GitHub Issues](https://github.com/paulboutin/crap-mcp/issues) for bugs, feature requests and proposed language packs. For a scoring bug, include a small source example, the coverage format, and the expected and actual scores. Use a synthetic example if the original code or report is private.
 
+For a security finding, include the rule and the source pattern it matched. For an accessibility finding, include the criterion, the element and whether the check failed or needs manual review. For a color issue, include the foreground, background, text size or UI role, expected threshold, and any simulation that changes the outcome. A minimal example with these details can reproduce the finding without sharing a full report.
+
 ## Run the project locally
 
 You need Git, npm and Node.js 24.12 or newer. Fork the repository, clone your fork and create a branch from the current `main`. From the checkout root, run:

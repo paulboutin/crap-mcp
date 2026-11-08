@@ -1,8 +1,10 @@
+import { accessibilityTools } from "./accessibility-tools.ts";
+import { securityTools } from "./security-tools.ts";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { backlog, lookup, page, query, slice } from "./backlog.ts";
 import { fingerprint, receipt } from "./coverage.ts";
-import { findings } from "./findings.ts";
+import { findings, functionExplanation } from "./findings.ts";
 import { policy, maybeRevision, revision, type Repo } from "./files.ts";
 import {
   integrationView,
@@ -12,10 +14,12 @@ import {
   scan,
   type Snapshot,
 } from "./scan.ts";
+import { saveFindingReport } from "./report-html.ts";
+import { codeReport, comparisonReport } from "./code-report.ts";
 import { scorecard } from "./scorecard.ts";
 import { compareChecks } from "./check-comparison.ts";
 import { recentRuns } from "./check-history.ts";
-import { sessionSummary } from "./session.ts";
+import { sessionSummary, sessionContribution } from "./session.ts";
 import { review } from "./review.ts";
 import { prepareLanguage, type Routine } from "./syntax.ts";
 
@@ -112,9 +116,17 @@ async function chatReview(
   repo: Repo,
   base: Snapshot,
   now: Snapshot,
-  summary: ReturnType<typeof sessionSummary>,
+  changes: ReturnType<typeof review>,
   showCard: boolean,
 ) {
+  const report = codeReport(repo.root, now);
+  report.review = comparisonReport(
+    base,
+    changes,
+    "snapshot " + base.id.slice(0, 12),
+  );
+  const summary = report.review.summary!;
+  const path = saveFindingReport(repo.local, base.id + "-" + now.id, report);
   const runs = recentRuns(repo);
   const latest = matchingCheck(repo, now, runs);
 
@@ -132,6 +144,7 @@ async function chatReview(
 
   if (latest?.trials?.length)
     lines.push(...compareChecks(latest, matchingCheck(repo, base, runs)));
+  lines.push("Detailed report: " + path);
   const result = { type: "text" as const, text: lines.join("\n") };
 
   if (!showCard) return { content: [result] };
@@ -183,6 +196,8 @@ export function analysisServer(select: (id?: string) => Desk, shared: boolean) {
     .describe("Project ID returned by register_project");
 
   const scope = { project: shared ? id : z.never().optional() };
+  accessibilityTools(server, select, scope);
+  securityTools(server, select, scope);
 
   server.registerTool(
     "analyze_function_health",
@@ -197,7 +212,12 @@ export function analysisServer(select: (id?: string) => Desk, shared: boolean) {
       const s = await desk.current(),
         h = lookup(s.rows, q.file, q.symbol, q.line);
 
-      return reply({ snapshot: meta(s), function: h, findings: findings(h) });
+      return reply({
+        snapshot: meta(s),
+        function: h,
+        detail: functionExplanation(h),
+        findings: findings(h),
+      });
     },
   );
   server.registerTool(
@@ -265,7 +285,11 @@ export function analysisServer(select: (id?: string) => Desk, shared: boolean) {
       return reply({
         snapshot: meta(s),
         ...section,
-        items: section.items.map((h) => ({ ...h, findings: findings(h) })),
+        items: section.items.map((h) => ({
+          ...h,
+          detail: functionExplanation(h),
+          findings: findings(h),
+        })),
       });
     },
   );
@@ -283,17 +307,25 @@ export function analysisServer(select: (id?: string) => Desk, shared: boolean) {
         base = desk.base(q.base, q.snapshot);
 
       const result = review(base, now, q.findingId);
-      const summary = sessionSummary(q.findingId ? review(base, now) : result);
+      const fullReview = q.findingId ? review(base, now) : result;
 
       if (q.format === "chat")
-        return chatReview(desk.repo, base, now, summary, q.scorecard);
+        return chatReview(desk.repo, base, now, fullReview, q.scorecard);
+
+      const affected = slice(result.affected, q.offset, q.limit);
 
       return reply({
-        summary,
+        summary: sessionSummary(fullReview),
         baseline: meta(base),
         current: meta(now),
         scope: "worktree",
-        affected: slice(result.affected, q.offset, q.limit),
+        affected: {
+          ...affected,
+          items: affected.items.map((p) => ({
+            ...p,
+            contribution: sessionContribution(p),
+          })),
+        },
         findings: slice(result.findings, q.offset, q.limit),
         unassessed: result.unassessed,
         selected: result.selected,

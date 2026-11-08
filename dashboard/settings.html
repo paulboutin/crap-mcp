@@ -118,6 +118,24 @@
           ><small id="suite"></small>
         </section>
         <section>
+          <h2>Application security</h2>
+          <p>Select source checks for the separate security score. These rules map to the OWASP Top 10:2025. Clearing all rules leaves security unrated.</p>
+          <label>Minimum security score <input id="minSecurityScore" type="number" min="0" max="100" step="1" placeholder="Off" /></label>
+          <small>Leave blank to report only. With a target, a lower score fails the project check and an unrated scan cannot pass.</small>
+          <fieldset id="securityRules" aria-label="Enabled application security rules"></fieldset>
+        </section>
+        <section>
+          <h2>Accessibility</h2>
+          <p>Choose the source checks for this project. The score is the percentage of evaluated checks that passed. Dynamic content may need manual review.</p>
+          <label>Minimum accessibility score <input id="minAccessibilityScore" type="number" min="0" max="100" step="1" placeholder="Off" /></label>
+          <small>Leave blank to report only. When a target is set, open reviews or an unrated scan keep the check incomplete. A measured score below the target fails.</small>
+          <label>Minimum colorblind score <input id="minColorblindScore" type="number" min="0" max="100" step="1" placeholder="Off" /></label>
+          <label for="accessibilityPalette">Status and chart color pairs (optional)</label>
+          <textarea id="accessibilityPalette" rows="3" placeholder="#2e7d32 #c62828 Approved / declined" style="width: min(100%, 45em)"></textarea>
+          <small>Enter two hex colors followed by their meaning, one pair per line. The colorblind score checks whether each pair retains a 3:1 contrast ratio under three simulations.</small>
+          <fieldset id="accessibilityRules" aria-label="Enabled accessibility rules"></fieldset>
+        </section>
+        <section>
           <h2>Language packs</h2>
           <p>
             Enable an optional parser to download it once for this machine. Each
@@ -175,7 +193,7 @@
             style="width: min(100%, 45em)"
           ></textarea>
           <p>
-            These directories are excluded from CRAP analysis and bundled
+            These directories are excluded from accessibility and security scans, CRAP analysis and bundled
             JavaScript/TypeScript lint. Native linters and test commands use
             their own configurations.
           </p>
@@ -233,6 +251,7 @@
         small.textContent = detail;
         li.append(small);
         parent.append(li);
+        return li;
       }
       function runs(list) {
         by("runs").replaceChildren();
@@ -256,7 +275,7 @@
               m.belowCoverage +
               " below coverage"
             : "Coverage evidence unavailable";
-          row(
+          const entry = row(
             by("runs"),
             new Date(run.at).toLocaleString() +
               " · " +
@@ -274,6 +293,8 @@
                 ([rule, n]) => rule + " × " + n,
               ),
               scores,
+              run.accessibility && ("Accessibility " + (run.accessibility.score ?? "unrated") + " · " + (run.accessibility.error ?? (run.accessibility.pending + " need review · colorblind " + (run.accessibility.colorblind?.score ?? "unrated") + " (" + run.accessibility.colorblindStatus + ")")) + " · " + run.accessibility.status),
+              run.security && ("Security " + (run.security.score ?? "unrated") + " · " + (run.security.error ?? (run.security.findings + " findings")) + " · " + run.security.status),
               "policy " + run.policy.slice(0, 8),
               run.commit?.slice(0, 8),
               ...(run.tools ?? []).map(
@@ -285,6 +306,10 @@
               .filter(Boolean)
               .join(" · "),
           );
+          const link = document.createElement("a");
+          link.href = "/checks/" + encodeURIComponent(new URLSearchParams(location.search).get("project")) + "/" + encodeURIComponent(run.at);
+          link.textContent = "Open findings for this check";
+          entry.append(link);
         }
         if (!list.length)
           by("runs").textContent = "No project checks recorded yet.";
@@ -303,6 +328,32 @@
           : "Settings and lessons are local to this checkout.";
         for (const key of ["maxCrap", "minCoverage"])
           by(key).value = data.settings[key];
+        by("minSecurityScore").value = data.settings.minSecurityScore ?? "";
+        const security = by("securityRules");
+        security.replaceChildren();
+        for (const [id, rule] of Object.entries(data.securityCatalog)) {
+          const label = document.createElement("label");
+          const input = document.createElement("input");
+          input.type = "checkbox";
+          input.value = id;
+          input.checked = data.settings.securityRules?.includes(id) ?? true;
+          label.append(input, " " + rule.title + " · " + rule.severity + " · " + rule.category);
+          security.append(label);
+        }
+        by("minColorblindScore").value=data.settings.minColorblindScore ?? "";
+        by("minAccessibilityScore").value = data.settings.minAccessibilityScore ?? "";
+        by("accessibilityPalette").value = (data.settings.accessibilityPalette ?? []).map(p=>p.first+" "+p.second+" "+p.label).join("\n");
+        const accessibility = by("accessibilityRules");
+        accessibility.replaceChildren();
+        for (const [id, rule] of Object.entries(data.accessibilityCatalog)) {
+          const label = document.createElement("label");
+          const input = document.createElement("input");
+          input.type = "checkbox";
+          input.value = id;
+          input.checked = data.settings.accessibilityRules?.includes(id) ?? true;
+          label.append(input, " " + rule.title + " · " + rule.category + " · " + rule.section508);
+          accessibility.append(label);
+        }
         by("omitDirectories").value = data.settings.omitDirectories.join("\n");
         by("analysisExclusions").textContent =
           "Additional analysis exclusions from .crap.json: " +
@@ -391,6 +442,16 @@
         button.disabled = true;
         try {
           const settings = {
+            minColorblindScore: by("minColorblindScore").value === "" ? null : by("minColorblindScore").valueAsNumber,
+            minAccessibilityScore: by("minAccessibilityScore").value === "" ? null : by("minAccessibilityScore").valueAsNumber,
+            accessibilityPalette: by("accessibilityPalette").value.split("\n").filter(line=>line.trim()).map(line=>{
+              const match=/^(#[a-f0-9]{3}(?:[a-f0-9]{3})?)\s+(#[a-f0-9]{3}(?:[a-f0-9]{3})?)\s+(.+)$/i.exec(line.trim());
+              if (!match) throw Error("Each palette row needs two hex colors and a label.");
+              return {first:match[1],second:match[2],label:match[3]};
+            }),
+            accessibilityRules: Array.from(by("accessibilityRules").querySelectorAll(":checked"), el => el.value),
+            minSecurityScore: by("minSecurityScore").value === "" ? null : by("minSecurityScore").valueAsNumber,
+            securityRules: Array.from(by("securityRules").querySelectorAll(":checked"), el => el.value),
             maxCrap: by("maxCrap").valueAsNumber,
             minCoverage: by("minCoverage").valueAsNumber,
             omitDirectories: by("omitDirectories")

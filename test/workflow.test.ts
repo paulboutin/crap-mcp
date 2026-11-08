@@ -399,3 +399,165 @@ test("an uncached Git baseline uses committed bytes and reports historical symli
     "resolved",
   );
 });
+
+test("security MCP scans syntax, compares a dirty baseline and renders a separate PNG", async (t) => {
+  const root = fixture(t);
+
+  const write = (name: string, source: string) =>
+    writeFileSync(join(root, name), source);
+
+  write(
+    "auth.js",
+    "eval(incoming);\n// eval(x)\nconst example = 'rejectUnauthorized: false';\nconst good = crypto.createHash('sha256');",
+  );
+  write(
+    "Client.swift",
+    "func check() {\n _ = Insecure.MD5.hash(data: bytes)\n}",
+  );
+  commit(root);
+  write(
+    "panel.tsx",
+    "export const ui = <div/>;\nconst options = { rejectUnauthorized: false };",
+  );
+  const c = await connect(t, root);
+
+  const scan = "scan_application_security",
+    review = "review_application_security";
+
+  const first = await call(c, scan, { limit: 1 });
+  assert.equal(first.score, 40);
+  assert.equal(first.assessed, 3);
+  assert.equal(first.findings.total, 3);
+
+  const page = await call(c, scan, {
+    snapshot: first.snapshot,
+    offset: 1,
+    limit: 1,
+  });
+
+  assert.equal(page.findings.items[0].rule, "dynamic-eval");
+  write("auth.js", "\n\neval(incoming);");
+  write("panel.tsx", "const options = { rejectUnauthorized: true };");
+  const diff = await call(c, review, { snapshot: first.snapshot });
+  assert.equal(diff.score, 65);
+  assert.equal(diff.comparison.resolved.items[0].rule, "tls-verification");
+  assert.equal(diff.comparison.introduced.total, 0);
+
+  const pinned = await call(c, review, {
+    base: "HEAD",
+    current: first.snapshot,
+  });
+
+  assert.equal(pinned.comparison.introduced.total, 1);
+
+  const card = await c.callTool({
+    name: review,
+    arguments: {
+      snapshot: first.snapshot,
+      current: diff.snapshot,
+      format: "chat",
+      scorecard: true,
+    },
+  });
+
+  const png = z
+    .object({
+      type: z.literal("image"),
+      mimeType: z.literal("image/png"),
+      data: z.string(),
+    })
+    .parse(card.content[1]);
+
+  assert.equal(
+    Buffer.from(png.data, "base64").subarray(1, 4).toString(),
+    "PNG",
+  );
+
+  const textCard = await c.callTool({
+    name: scan,
+    arguments: { snapshot: first.snapshot, format: "chat" },
+  });
+
+  assert.match(
+    z.object({ text: z.string() }).parse(textCard.content[0]).text,
+    /40\/100/,
+  );
+  await assert.rejects(
+    call(c, review, { snapshot: first.snapshot, base: "HEAD" }),
+    /Choose/,
+  );
+  await assert.rejects(
+    call(c, scan, { snapshot: "a".repeat(64) }),
+    /Unknown security snapshot/,
+  );
+  write("auth.js", "function (");
+  const gap = await call(c, review, { snapshot: first.snapshot });
+  assert.equal(gap.score, null);
+  assert.equal(gap.comparison.comparable, false);
+  assert.equal(gap.comparison.resolved.total, 0);
+  assert.match(gap.skipped.items[0].reason, /Syntax error/);
+});
+
+test("accessibility MCP preserves a dirty baseline, reports known results separately from manual checks and returns its own card", async (t) => {
+  const root = fixture(t);
+  const path = join(root, "screen.html");
+  const put = (source: string) => writeFileSync(path, source);
+  put('<html lang="en"><img alt="Map"></html>');
+  commit(root);
+  put('<html lang="en"><img>\n<button aria-label="Exit">Save</button></html>');
+  const c = await connect(t, root);
+
+  const scan = "scan_application_accessibility",
+    review = "review_application_accessibility";
+
+  const first = await call(c, scan, { limit: 1 });
+  assert.equal(first.score, 50);
+  assert.equal(first.findings.total, 2);
+
+  const page = await call(c, scan, {
+    snapshot: first.snapshot,
+    offset: 1,
+    limit: 1,
+  });
+
+  assert.equal(page.findings.items[0].line, 2);
+  assert.match(first.catalog["label-in-name"].section508, /outside/);
+  put(
+    '<html lang="en"><img alt="Map">\n<button aria-label="Save draft">Save</button></html>',
+  );
+  const diff = await call(c, review, { snapshot: first.snapshot });
+  assert.equal(diff.score, 100);
+  assert.equal(diff.comparison.resolved.total, 2);
+  const old = await call(c, review, { base: "HEAD", current: first.snapshot });
+  assert.equal(old.comparison.introduced.total, 2);
+
+  const card = await c.callTool({
+    name: review,
+    arguments: {
+      snapshot: first.snapshot,
+      current: diff.snapshot,
+      format: "chat",
+      scorecard: true,
+    },
+  });
+
+  assert.equal(card.content[1].type, "image");
+  assert.match(
+    z.object({ text: z.string() }).parse(card.content[0]).text,
+    /50 → 100/,
+  );
+  const text = await c.callTool({ name: scan, arguments: { format: "chat" } });
+  assert.match(
+    z.object({ text: z.string() }).parse(text.content[0]).text,
+    /4 passed/,
+  );
+  writeFileSync(join(root, "view.tsx"), "const ui = <button>{label}</button>;");
+  const unknown = await call(c, review, { snapshot: first.snapshot });
+  assert.equal(unknown.pending.total, 3);
+  assert.equal(unknown.comparison.comparable, true);
+  assert.equal(unknown.comparison.resolved.total, 2);
+  await assert.rejects(
+    call(c, review, { snapshot: "a".repeat(64) }),
+    /Unknown accessibility snapshot/,
+  );
+});

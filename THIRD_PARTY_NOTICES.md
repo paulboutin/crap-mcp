@@ -28,7 +28,8 @@ The installer uses `npm ci` with the committed [lockfile](package-lock.json). In
 
 | Direct runtime packages | License | Installed license file |
 | --- | --- | --- |
-| `@modelcontextprotocol/sdk`, `@oxlint/plugins`, `oxlint`, `web-tree-sitter`, `zod` | MIT | `node_modules/<package>/LICENSE` |
+| `@modelcontextprotocol/sdk`, `@oxlint/plugins`, `oxlint`, `parse5`, `web-tree-sitter`, `zod` | MIT | `node_modules/<package>/LICENSE` |
+| `jsdom` | MIT | `node_modules/jsdom/LICENSE.txt` |
 | `jsonc-parser` | MIT | `node_modules/jsonc-parser/LICENSE.md` |
 | `@resvg/resvg-js` and its native renderer | MPL-2.0 | `node_modules/@resvg/resvg-js/LICENSE` |
 

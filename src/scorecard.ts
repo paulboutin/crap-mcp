@@ -49,7 +49,6 @@ export async function scorecard(
   summary: Summary,
   run?: CheckRun,
 ) {
-  const { Resvg } = await import("@resvg/resvg-js");
   const [value, label] = grade(summary);
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="680" height="250" viewBox="0 0 680 250">
@@ -64,13 +63,19 @@ export async function scorecard(
     ${metric(478, "Benchmarks", trials(run, "benchmark"))}
     </g></svg>`;
 
+  return saveCard(directory, baseline + "-" + current, svg);
+}
+
+export async function saveCard(directory: string, key: string, svg: string) {
+  const { Resvg } = await import("@resvg/resvg-js");
+
   const png = new Resvg(svg, { fitTo: { mode: "width", value: 1020 } })
     .render()
     .asPng();
 
   const folder = join(directory, "scorecards");
   mkdirSync(folder, { recursive: true });
-  const path = join(folder, baseline + "-" + current + ".png");
+  const path = join(folder, key + ".png");
   const temporary = path + "." + randomUUID();
   writeFileSync(temporary, png, { mode: 0o600 });
   renameSync(temporary, path);

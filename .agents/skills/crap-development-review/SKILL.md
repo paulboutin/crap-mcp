@@ -20,3 +20,5 @@ Review with `review_changes` using the starting snapshot and optional finding ID
 
 At completion call review_changes again with the same starting snapshot and `format:"chat", scorecard:true`.
 Include its session rating, measured/affected counts, and a representative raw CRAP before → after in the visible chat reply, alongside actual test results. If the result is partial, unchanged or unrated, report it that way. When using the machine service, link the matching session dashboard at http://127.0.0.1:47731/?project=<id>&snapshot=<start-id>. Show the returned scorecard in the final reply. In Codex desktop use Markdown image syntax with the exact absolute path from `Scorecard:`. In a client that displays MCP images, use the returned PNG. For text terminals or remote clients where the image is unavailable, show the text grade, evidence and dashboard link. The agent sends this as its reply to the current chat.
+
+Link the HTML path after `Detailed report:` alongside the scorecard. For a material finding, identify the snapshot and affected lines, explain the observed trigger and possible impact, and describe the repair and verification in the report.

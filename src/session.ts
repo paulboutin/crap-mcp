@@ -1,4 +1,4 @@
-import type { Health } from "./findings.ts";
+import { functionExplanation, type Health } from "./findings.ts";
 import type { review } from "./review.ts";
 
 type Review = ReturnType<typeof review>;
@@ -13,6 +13,29 @@ interface Tally {
   removed: number;
 }
 
+function sessionCredits(h: Health) {
+  const measured = h.score !== null && h.coverage.percent !== null;
+
+  return {
+    complexity: Number(h.complexity < 10),
+    nesting: Number(h.depth < 4),
+    crap: measured ? Number(h.score! <= 30) : null,
+    coverage: measured ? h.coverage.percent! / 100 : null,
+  };
+}
+
+export function sessionContribution(p: Pair) {
+  const h = p.after ?? p.before!;
+
+  return {
+    symbol: h.symbol,
+    before: p.before?.score,
+    after: p.after?.score,
+    credits: p.after ? sessionCredits(p.after) : null,
+    detail: functionExplanation(h),
+  };
+}
+
 function tally(rows: Pair[]) {
   const t: Tally = { known: 0, unknown: 0, measured: 0, total: 0, removed: 0 };
 
@@ -23,15 +46,14 @@ function tally(rows: Pair[]) {
     }
 
     t.total++;
-    t.known += Number(h.complexity < 10) + Number(h.depth < 4);
+    const credits = sessionCredits(h);
 
-    if (h.score === null || h.coverage.percent === null) {
-      t.unknown += 2;
-      continue;
+    for (const credit of Object.values(credits)) {
+      if (credit === null) t.unknown++;
+      else t.known += credit;
     }
 
-    t.measured++;
-    t.known += Number(h.score <= 30) + h.coverage.percent / 100;
+    if (credits.coverage !== null) t.measured++;
   }
 
   return t;

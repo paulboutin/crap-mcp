@@ -203,18 +203,29 @@ export function parse(file: string, source: string) {
   const language = languageFor(file);
 
   if (!language) throw Error("Unsupported source extension: " + file);
-  const parser = parsers.get(language.id)!;
-  const tree = parser.parse(source);
+
+  return withSyntax(language.id, source, (root) => {
+    const state: Walk = { rows: [], counts: new Map(), language };
+    visit(root, "", state, undefined, 0);
+
+    return uniqueCallbacks(state.rows);
+  });
+}
+
+export function withSyntax<T>(
+  id: string,
+  source: string,
+  inspect: (root: Node) => T,
+) {
+  const tree = parsers.get(id)!.parse(source);
 
   if (!tree) throw Error("Parser did not produce a tree");
 
   try {
     if (tree.rootNode.hasError)
       throw Error("Syntax error or unsupported grammar");
-    const state: Walk = { rows: [], counts: new Map(), language };
-    visit(tree.rootNode, "", state, undefined, 0);
 
-    return uniqueCallbacks(state.rows);
+    return inspect(tree.rootNode);
   } finally {
     tree.delete();
   }
