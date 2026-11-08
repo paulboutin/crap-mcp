@@ -230,6 +230,7 @@ button:disabled {
   outline-offset: 2px;
 }
 .tablewrap {
+  container-type: inline-size;
   overflow-x: auto;
 }
 table {
@@ -271,8 +272,31 @@ td small {
 summary {
   font-weight: 600;
 }
-td details p {
-  max-width: 480px;
+.function-toggle {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-weight: 600;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.function-toggle::before {
+  content: "";
+  display: inline-block;
+  margin-inline-end: .5em;
+  border-block: .32em solid transparent;
+  border-inline-start: .5em solid currentColor;
+}
+.function-toggle[aria-expanded="true"]::before {
+  transform: rotate(90deg);
+}
+.function-inspection {
+  contain: inline-size;
+  max-inline-size: calc(100cqi - 16px);
+  border-inline-start: 3px solid var(--teal);
+  padding: 2px 12px;
+}
+.function-inspection p {
   font-size: 13px;
   margin: 7px 0;
 }

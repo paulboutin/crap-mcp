@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { JSDOM } from "jsdom";
 import { renderReport, type Report } from "../src/report-view.ts";
-import { health, findings } from "../src/findings.ts";
+import { functionExplanation, health, findings } from "../src/findings.ts";
 import { parse } from "../src/syntax.ts";
 
 test("offline dashboard distinguishes risk from unscored, pages and filters, and renders repository strings as text", () => {
@@ -35,7 +35,14 @@ test("offline dashboard distinguishes risk from unscored, pages and filters, and
       i === 1 ? undefined : run,
     );
 
-    return { ...h, findings: findings(h) };
+    return {
+      ...h,
+      findings: findings(h),
+      detail: {
+        ...functionExplanation(h),
+        scoring: "Previously saved generic formula",
+      },
+    };
   });
 
   const base: Report = {
@@ -98,11 +105,27 @@ test("offline dashboard distinguishes risk from unscored, pages and filters, and
   const next = doc.querySelector<HTMLButtonElement>("#next")!,
     prev = doc.querySelector<HTMLButtonElement>("#previous")!;
 
-  assert.equal(doc.querySelectorAll("tbody tr").length, 10);
+  assert.equal(doc.querySelectorAll("tbody tr:not([hidden])").length, 10);
   const cells = doc.querySelectorAll("tbody tr:first-child td");
   assert.equal(cells[1].textContent, "11 / 10");
   assert.equal(cells[3].textContent, "132.00 / 30");
   assert.equal(cells[4].textContent, "Critical");
+  const toggle = cells[0].querySelector("button")!;
+  toggle.click();
+  const inspection = doc.getElementById(toggle.getAttribute("aria-controls")!)!;
+  assert.equal(inspection, cells[0].parentElement!.nextElementSibling);
+  assert.equal(inspection.hidden, false);
+  assert.equal(inspection.querySelector("td")!.colSpan, cells.length);
+  assert.match(inspection.textContent!, /How to address it/);
+  assert.match(inspection.textContent!, /coverage gap adds 121 points/);
+  assert.doesNotMatch(
+    inspection.textContent!,
+    /Previously saved generic formula/,
+  );
+  assert.equal(toggle.getAttribute("aria-expanded"), "true");
+  toggle.click();
+  assert.equal(inspection.hidden, true);
+  assert.equal(toggle.getAttribute("aria-expanded"), "false");
   next.click();
   assert.equal(text("range"), "11–12 of 12");
   prev.click();
@@ -115,7 +138,7 @@ test("offline dashboard distinguishes risk from unscored, pages and filters, and
   ]) {
     filter.value = value;
     filter.dispatchEvent(new window.Event("change"));
-    assert.equal(doc.querySelector("tbody summary")?.textContent, symbol);
+    assert.equal(doc.querySelector("tbody button")?.textContent, symbol);
   }
 
   const search = doc.querySelector<HTMLInputElement>("#search")!;

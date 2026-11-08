@@ -253,7 +253,7 @@ test("dashboard shows the saved scan during refresh and invalidates the full rep
   const doc = new JSDOM(await (await fetch(recorded)).text()).window.document;
   renderReport(doc, JSON.parse(doc.getElementById("data")!.textContent!));
   assert.equal(doc.querySelector("h1")!.textContent, "Recorded repository report");
-  assert.equal(doc.querySelector("tbody summary")!.textContent, "savedFunction");
+  assert.equal(doc.querySelector("tbody button")!.textContent, "savedFunction");
   assert.equal(doc.getElementById("fraction")!.textContent, "1 of 1 functions scored");
   assert.match(doc.getElementById("meta")!.textContent!, /audit-tests/);
   rmSync(recordedReportPath(repo.local));

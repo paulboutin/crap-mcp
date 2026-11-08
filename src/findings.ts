@@ -1,3 +1,4 @@
+import { scoreEffect } from "./crap-score.ts";
 import type { FindingDetail } from "./finding-detail.ts";
 import { z } from "zod";
 import { digest } from "./files.ts";
@@ -71,7 +72,7 @@ function band(n: number | null) {
 export type Rule = "crap" | "complexity" | "nesting" | "coverage";
 
 const impacts = {
-  crap: "Several paths share limited test evidence. A change that works on the common path can still break an untested outcome.",
+  crap: "Changes to one execution path can affect other outcomes in this function. Check the affected behaviors before changing its branches.",
   complexity:
     "Each decision adds a path a maintainer must reason about. Interacting branches make edge cases easier to miss.",
   nesting:
@@ -90,6 +91,12 @@ export interface Finding {
   check: string;
 }
 
+function coverageUnits(h: Health) {
+  return h.coverage.basis === "function-entry"
+    ? "callback entries exercised"
+    : "measured lines covered";
+}
+
 export function findings(h: Health) {
   const rows: Finding[] = [];
 
@@ -100,13 +107,6 @@ export function findings(h: Health) {
     action: string,
     check: string,
   ) {
-    const criteria = {
-      crap: "CRAP above 30 triggers a finding. Above 60 is critical.",
-      complexity: "Complexity of 10 or more triggers a structural finding.",
-      nesting: "Nesting depth of 4 or more triggers a structural finding.",
-      coverage: "Missing comparable coverage leaves CRAP unrated.",
-    };
-
     const preview = {
       crap: h.uncoveredExcerpt,
       nesting: h.deepestExcerpt,
@@ -123,7 +123,7 @@ export function findings(h: Health) {
       impact: impacts[rule],
       action,
       check,
-      scoring: criteria[rule],
+      scoring: scoreEffect(h, rule),
     };
 
     rows.push({
@@ -141,7 +141,7 @@ export function findings(h: Health) {
     add(
       "crap",
       h.score,
-      `CRAP ${h.score.toFixed(2)}; ${h.coverage.covered}/${h.coverage.executable} measured lines covered.`,
+      `CRAP ${h.score.toFixed(2)}; ${h.coverage.covered}/${h.coverage.executable} ${coverageUnits(h)}.`,
       "Inspect uncovered lines and add a behavior test, or simplify a decision.",
       "Rerun the designated suite and verify CRAP ≤ 30.",
     );
@@ -196,7 +196,9 @@ export function functionExplanation(h: Health): FindingDetail {
         : h.coverage.covered +
           "/" +
           h.coverage.executable +
-          " measured lines covered (" +
+          " " +
+          coverageUnits(h) +
+          " (" +
           h.coverage.percent.toFixed(1) +
           "%)."),
     impact:
@@ -205,8 +207,7 @@ export function functionExplanation(h: Health): FindingDetail {
         : h.score > 30
           ? impacts.crap
           : "The measured change risk is within the CRAP threshold. Inspect uncovered behavior and structural findings when changing this function.",
-    scoring:
-      "CRAP = complexity² × (1 − coverage fraction)³ + complexity. Lower scores indicate less measured change risk.",
+    scoring: scoreEffect(h),
     action: h.coverage.uncovered.length
       ? "Exercise a behavior that reaches uncovered lines " +
         h.coverage.uncovered.join(", ") +

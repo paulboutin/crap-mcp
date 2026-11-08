@@ -1,4 +1,5 @@
-// Shipped as a standalone ES module in the offline report. Keep imports type-only.
+// Runtime imports must also be embedded by report-html for offline use.
+import { scoreEffect } from "./crap-score.ts";
 import type { Health, Finding } from "./findings.ts";
 import type { Delta } from "./review.ts";
 import type { Snapshot } from "./scan.ts";
@@ -260,21 +261,24 @@ function include(h: Row, filter: string) {
 }
 
 function describe(doc: Document, h: Row) {
-  const group = details(doc, h.symbol);
+  const group = doc.createElement("div");
+  group.className = "function-inspection";
 
-  if (h.patterns?.length) {
+  const patterns = h.patterns ?? [];
+
+  if (patterns.length > 5)
     group.append(
       element(
         doc,
         "p",
-        h.patterns.length +
+        "Showing 5 of " +
+          patterns.length +
           " language-rule findings. Search this function in Code patterns for the full list.",
       ),
     );
 
-    for (const item of h.patterns.slice(0, 5))
-      group.append(patternEntry(doc, item));
-  }
+  for (const item of patterns.slice(0, 5))
+    group.append(patternEntry(doc, item));
 
   group.append(
     element(
@@ -299,21 +303,50 @@ function describe(doc: Document, h: Row) {
     );
 
   if (h.detail)
-    group.append(findingDetails(doc, "How this function scored", h.detail));
+    group.append(
+      findingDetails(doc, "How this function scored", {
+        ...h.detail,
+        scoring: scoreEffect(h),
+      }),
+    );
 
   for (const f of h.findings)
-    group.append(findingDetails(doc, f.rule + " · " + f.value, f.detail));
+    group.append(
+      findingDetails(doc, f.rule + " · " + f.value, {
+        ...f.detail,
+        scoring: scoreEffect(h, f.rule),
+      }),
+    );
 
   return group;
 }
 
-function row(doc: Document, h: Row) {
+function functionRows(doc: Document, h: Row, index: number) {
   const tr = doc.createElement("tr"),
     name = doc.createElement("td"),
     risk = doc.createElement("td");
 
+  const toggle = element(doc, "button", h.symbol);
+  const inspection = doc.createElement("tr");
+  inspection.id = "function-inspection-" + index;
+  inspection.hidden = true;
+  toggle.type = "button";
+  toggle.className = "function-toggle";
+  toggle.setAttribute("aria-expanded", "false");
+  toggle.setAttribute("aria-controls", inspection.id);
+  toggle.addEventListener("click", () => {
+    if (!inspection.cells.length) {
+      const cell = inspection.insertCell();
+      cell.colSpan = tr.cells.length;
+      cell.append(describe(doc, h));
+    }
+
+    inspection.hidden = !inspection.hidden;
+    toggle.setAttribute("aria-expanded", String(!inspection.hidden));
+  });
+
   name.append(
-    describe(doc, h),
+    toggle,
     element(doc, "small", h.file + ":" + h.start + "–" + h.end),
   );
 
@@ -340,7 +373,7 @@ function row(doc: Document, h: Row) {
     risk,
   );
 
-  return tr;
+  return [tr, inspection];
 }
 
 function explorer(doc: Document, functions: Row[]) {
@@ -370,7 +403,7 @@ function explorer(doc: Document, functions: Row[]) {
 
     const end = Math.min(offset + 10, hits.length);
     byId(doc, "rows").replaceChildren(
-      ...hits.slice(offset, end).map((h) => row(doc, h)),
+      ...hits.slice(offset, end).flatMap((h, i) => functionRows(doc, h, i)),
     );
     byId(doc, "empty").hidden = hits.length !== 0;
     byId(doc, "match").textContent = hits.length + " matching";
@@ -865,6 +898,7 @@ function checkTargets(doc: Document, r: RecordedCheck, rows: Row[]) {
 function patternEntry(doc: Document, item: Pattern) {
   const location = item.file + (item.line ? ":" + item.line : "");
   const group = details(doc, item.rule + " · " + location);
+  group.className = "finding";
   const list = doc.createElement("dl");
   field(doc, list, "Reported by", item.tool);
   field(doc, list, "Function", item.symbol ?? "No unique enclosing function");

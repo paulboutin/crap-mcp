@@ -45,13 +45,13 @@ try {
   const started = performance.now();
 
   const inspection = await call("analyze_function_health", {
-    file: "src/coverage.ts",
+    file: "src/crap-score.ts",
     symbol: "score",
   });
 
   const warm = performance.now();
   await call("analyze_function_health", {
-    file: "src/coverage.ts",
+    file: "src/crap-score.ts",
     symbol: "score",
   });
   const warmMs = Math.round(performance.now() - warm);
