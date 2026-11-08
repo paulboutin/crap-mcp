@@ -43,6 +43,7 @@ function reportInputs(repo: Repo) {
       qualityPolicy(repo).revision,
       recentRuns(repo),
       stamp(join(repo.local, "coverage.json")),
+      stamp(join(repo.local, "patterns-latest.json")),
       head && stamp(join(repo.store, head + ".json")),
     ]),
   );

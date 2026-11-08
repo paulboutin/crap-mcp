@@ -110,6 +110,17 @@ REPORT_LICENSE
         <h2>Project thresholds</h2><p id="target-count"></p>
         <details><summary>Functions outside the project thresholds</summary><ul id="target-findings"></ul></details>
       </section>
+      <section class="panel" id="pattern-panel">
+        <small class="eyebrow">LANGUAGE CHECKS</small>
+        <h2>Code patterns</h2>
+        <p id="pattern-summary">This report has no language-rule evidence. Generate a new dashboard to collect it.</p>
+        <ul id="pattern-scope"></ul>
+        <div id="pattern-browser" hidden>
+          <label>Find a rule, function, or file <input type="search" id="pattern-search" /></label>
+          <div id="pattern-list"></div>
+          <div class="pager"><button id="pattern-prev">Previous findings</button><span id="pattern-range" aria-live="polite"></span><button id="pattern-next">Next findings</button></div>
+        </div>
+      </section>
       <section class="panel" id="function-panel">
         <div class="section-head">
           <div>
@@ -135,6 +146,7 @@ REPORT_LICENSE
           ><label
             >Show<select id="filter">
               <option value="all">All functions</option>
+              <option value="patterns">Functions with code patterns</option>
               <option value="risk">Risk hotspots</option>
               <option value="structure">Structural findings</option>
               <option value="unscored">Unscored functions</option>

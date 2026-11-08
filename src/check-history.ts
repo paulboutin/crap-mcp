@@ -32,6 +32,7 @@ export function measurements(s: Snapshot, targets: Targets) {
 }
 
 export interface CheckRun {
+  patternSnapshot?: string;
   thresholds?: { maxCrap: number; minCoverage: number };
   accessibility?: ReturnType<
     typeof import("./accessibility.ts").accessibilityCheck

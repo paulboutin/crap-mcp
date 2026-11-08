@@ -1,3 +1,5 @@
+import { linkPatterns } from "./pattern-evidence.ts";
+import { latestPatterns } from "./pattern-scan.ts";
 import { dashboardAccessibility } from "./accessibility.ts";
 import { dashboardSecurity } from "./security.ts";
 import {
@@ -197,6 +199,10 @@ export async function projectReport(
       current.commit,
     ),
     security: dashboardSecurity(desk.repo, securitySnapshot, current.commit),
+    patterns: linkPatterns(
+      latestPatterns(desk.repo, current.input),
+      current.rows,
+    ),
     evidence: projectEvidence(desk.repo),
   };
 

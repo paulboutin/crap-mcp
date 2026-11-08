@@ -9,7 +9,15 @@ type Contribution = ReturnType<
   typeof import("./session.ts").sessionContribution
 >;
 
-type Row = Health & { findings: Finding[]; detail?: FindingDetail };
+type PatternReport = import("./pattern-evidence.ts").PatternReport;
+
+type Pattern = PatternReport["findings"][number];
+
+type Row = Health & {
+  patterns?: Pattern[];
+  findings: Finding[];
+  detail?: FindingDetail;
+};
 
 interface Review {
   summary?: ReturnType<typeof import("./session.ts").sessionSummary>;
@@ -22,6 +30,7 @@ interface Review {
 }
 
 export interface Report {
+  patterns?: PatternReport;
   recorded?: boolean;
   auditNotes?: string[];
   evidence?: ReturnType<typeof import("./project-learning.ts").projectEvidence>;
@@ -235,6 +244,8 @@ function isHot(h: Row) {
 
 function include(h: Row, filter: string) {
   switch (filter) {
+    case "patterns":
+      return Boolean(h.patterns?.length);
     case "risk":
       return isHot(h);
     case "structure":
@@ -250,6 +261,21 @@ function include(h: Row, filter: string) {
 
 function describe(doc: Document, h: Row) {
   const group = details(doc, h.symbol);
+
+  if (h.patterns?.length) {
+    group.append(
+      element(
+        doc,
+        "p",
+        h.patterns.length +
+          " language-rule findings. Search this function in Code patterns for the full list.",
+      ),
+    );
+
+    for (const item of h.patterns.slice(0, 5))
+      group.append(patternEntry(doc, item));
+  }
+
   group.append(
     element(
       doc,
@@ -325,8 +351,8 @@ function explorer(doc: Document, functions: Row[]) {
       a.symbol.localeCompare(b.symbol),
   );
 
-  const search = doc.querySelector("input")!,
-    filter = doc.querySelector("select")!;
+  const search = doc.querySelector<HTMLInputElement>("#search")!,
+    filter = doc.querySelector<HTMLSelectElement>("#filter")!;
 
   const previous = doc.querySelector<HTMLButtonElement>("#previous")!,
     next = doc.querySelector<HTMLButtonElement>("#next")!;
@@ -836,6 +862,105 @@ function checkTargets(doc: Document, r: RecordedCheck, rows: Row[]) {
     list.childElementCount + " functions outside the recorded thresholds.";
 }
 
+function patternEntry(doc: Document, item: Pattern) {
+  const location = item.file + (item.line ? ":" + item.line : "");
+  const group = details(doc, item.rule + " · " + location);
+  const list = doc.createElement("dl");
+  field(doc, list, "Reported by", item.tool);
+  field(doc, list, "Function", item.symbol ?? "No unique enclosing function");
+  field(doc, list, "Finding", item.message);
+  const guide = item.impact;
+
+  if (guide) field(doc, list, "Potential impact", guide);
+  field(
+    doc,
+    list,
+    "Suggested action",
+    item.action ||
+      "Inspect the flagged expression against the named rule and test the affected behavior.",
+  );
+  field(
+    doc,
+    list,
+    "Verify",
+    "Rerun " +
+      item.tool +
+      " and the relevant tests. This finding does not change the CRAP score.",
+  );
+  group.append(list);
+
+  if (item.excerpt) group.append(element(doc, "pre", item.excerpt));
+
+  return group;
+}
+
+function patternPanel(
+  doc: Document,
+  data: PatternReport | undefined,
+  rows: Row[],
+) {
+  if (!data) return;
+  byId(doc, "pattern-summary").textContent =
+    data.findings.length +
+    " individual findings · " +
+    data.spacing +
+    " spacing findings grouped separately. No test coverage is required.";
+
+  for (const note of data.notes)
+    byId(doc, "pattern-scope").append(element(doc, "li", note));
+  const owners = new Map(rows.map((row) => [row.id, row]));
+
+  for (const item of data.findings) {
+    const owner = owners.get(item.owner ?? "");
+
+    if (owner) (owner.patterns ??= []).push(item);
+  }
+
+  if (data.findings.length) patternBrowser(doc, data.findings);
+}
+
+function patternBrowser(doc: Document, items: Pattern[]) {
+  byId(doc, "pattern-browser").hidden = false;
+  const search = doc.querySelector<HTMLInputElement>("#pattern-search")!;
+  const prev = doc.querySelector<HTMLButtonElement>("#pattern-prev")!;
+  const next = doc.querySelector<HTMLButtonElement>("#pattern-next")!;
+  let offset = 0;
+  let hits = items;
+
+  function draw() {
+    const end = Math.min(offset + 10, hits.length);
+    byId(doc, "pattern-list").replaceChildren(
+      ...hits.slice(offset, end).map((item) => patternEntry(doc, item)),
+    );
+    byId(doc, "pattern-range").textContent = hits.length
+      ? offset + 1 + "–" + end + " of " + hits.length
+      : "No matching findings";
+    prev.disabled = offset === 0;
+    next.disabled = end >= hits.length;
+  }
+
+  search.addEventListener("input", () => {
+    const term = search.value.trim().toLowerCase();
+    hits = items.filter((item) =>
+      [item.tool, item.rule, item.file, item.symbol]
+        .join(" ")
+        .toLowerCase()
+        .includes(term),
+    );
+    offset = 0;
+    draw();
+  });
+  prev.addEventListener("click", () => {
+    offset -= 10;
+    draw();
+  });
+  next.addEventListener("click", () => {
+    offset += 10;
+    draw();
+  });
+  draw();
+}
+
 function recordedCheck(doc: Document, r: RecordedCheck) {
   doc.querySelector("h1")!.textContent = "Recorded project check";
   byId(doc, "repo").textContent = r.repository;
@@ -845,6 +970,7 @@ function recordedCheck(doc: Document, r: RecordedCheck) {
   for (const selector of [".session", ".cards", ".strip", ".footgrid"])
     doc.querySelector(selector)?.remove();
   const rows = r.code.data;
+  patternPanel(doc, r.patterns, rows ?? []);
 
   if (rows) {
     checkTargets(doc, r, rows);
@@ -901,5 +1027,6 @@ export function renderReport(
   summary(doc, r);
   evidence(doc, r);
   patch(doc, r.review);
+  patternPanel(doc, r.patterns, r.functions);
   explorer(doc, r.functions);
 }

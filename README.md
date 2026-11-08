@@ -47,6 +47,14 @@ The extra tests closed the coverage gap. The refactor then reduced the number of
 
 Run `npm ci` and `npm run prove` to [reproduce the measurements](#reproduce-the-end-to-end-proof).
 
+## Inspect a recommendation for one function
+
+In **Function explorer**, select **Functions with code patterns**, expand a function, then open its rule. In this fictional example, `submitNote` calls `saveNote(text)` and returns before the save finishes. Oxlint identifies the unhandled promise even without test coverage.
+
+![Expanded Oxlint finding for submitNote showing the source line, the risk of an unhandled rejection, and how to fix and verify it.](docs/images/function-recommendation.png)
+
+The [finding walkthrough](docs/findings.md#inspect-a-function-recommendation) shows how to test the rejected save.
+
 ## Try it on this repository
 
 Requires Git and Node.js 24.12+ (CI runs Node 24). From the clone root:
@@ -280,3 +288,11 @@ The local SQLite link records the GitHub project, issue number and stable findin
 ## Repository lint policy
 
 All 18 generic [anti-slop](tools/oxlint/anti-slop/UPSTREAM.md) rules and Oxlint's native accumulating-spread check run as errors on owned code. The plugin, its upstream notices and its embedded Stylistic license are vendored. `npm run lint` is a separate gate from the metric backlog: a style violation does not alter cyclomatic complexity or the CRAP formula. The self-scan covers production TypeScript; tests and vendored third-party rules are excluded from the production backlog.
+
+### Actionable code patterns
+
+Generate a dashboard with `npm run dashboard -- /absolute/path/to/checkout`. With the macOS machine install, use `node ~/.local/share/crap-mcp/current/scripts/dashboard.mjs /absolute/path/to/checkout`. This collects fresh language checks and replaces that checkout’s recorded dashboard. Keep the original suite configuration and coverage receipt in place if you also want comparable CRAP scores.
+
+**Code patterns** shows individual diagnostics with the rule, file and line, source excerpt, and a suggested next step. Search by rule, file, or function. The function explorer can filter to functions with patterns, including unscored ones. Ambiguous matches and findings outside functions remain in the list. Readable-spacing violations are counted separately. Existing reports without these diagnostics must be regenerated.
+
+The scan runs the project’s configured Oxlint rules and two additional TypeScript promise rules for files under a tsconfig.json. Install the target project's dependencies for type resolution. When Swift sources are present it also tries SwiftLint (`swiftlint` on PATH) with three focused rules: force_try, force_cast, weak_delegate. Unavailable tools are identified in the report. The additional language checks are advisory; existing check thresholds and the CRAP formula are unchanged. To collect or page the findings from MCP, use `scan_code_patterns` and pass its returned snapshot on subsequent pages. A project check also records the evidence; opening an old report never reruns a linter.

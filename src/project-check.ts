@@ -3,138 +3,13 @@ import { securityCheck } from "./security.ts";
 import { runTrial } from "./experiments.ts";
 import { adapter } from "./languages.ts";
 import { spawnSync } from "node:child_process";
-import { lstatSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { matchesGlob, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { z } from "zod";
-import {
-  digest,
-  omitted,
-  maybeRevision,
-  repository,
-  workFiles,
-  type Repo,
-} from "./files.ts";
+import { capturePatterns } from "./pattern-scan.ts";
+import { digest, maybeRevision, repository, type Repo } from "./files.ts";
 import { fingerprint } from "./coverage.ts";
 import { record, SuiteFailed } from "./record.ts";
 import { scan } from "./scan.ts";
-import {
-  lintTemplate,
-  qualityPolicy,
-  catalog,
-  type Targets,
-} from "./quality-policy.ts";
+import { qualityPolicy, type Targets } from "./quality-policy.ts";
 import { measurements, saveRun, type CheckRun } from "./check-history.ts";
-
-function lintMetrics(repo: Repo, settings: Targets): CheckRun["lint"] {
-  const temp = mkdtempSync(join(tmpdir(), "crap-lint-"));
-
-  try {
-    const config = join(temp, "config.json");
-
-    const plugin = fileURLToPath(
-      new URL("../tools/oxlint/anti-slop/index.ts", import.meta.url),
-    );
-
-    const rules = Object.fromEntries(
-      catalog.map((name) => [
-        name,
-        settings.rules.includes(name) ? "error" : "off",
-      ]),
-    );
-
-    writeFileSync(
-      config,
-      JSON.stringify({
-        rules,
-        ignorePatterns: lintTemplate.ignorePatterns,
-        jsPlugins: [{ name: "anti-slop", specifier: plugin }],
-      }),
-    );
-
-    return lintFiles(repo, config);
-  } catch (error) {
-    return { files: 0, violations: 0, rules: {}, error: String(error) };
-  } finally {
-    rmSync(temp, { recursive: true, force: true });
-  }
-}
-
-function lintSources(repo: Repo) {
-  return workFiles(repo).filter(
-    (file) =>
-      /\.[cm]?[jt]sx?$/.test(file) &&
-      !omitted(repo, file) &&
-      !lintTemplate.ignorePatterns.some((pattern) =>
-        matchesGlob(file, pattern),
-      ) &&
-      lstatSync(join(repo.root, file), { throwIfNoEntry: false })?.isFile(),
-  );
-}
-
-function lintFiles(repo: Repo, config: string) {
-  const files = lintSources(repo);
-
-  const result: CheckRun["lint"] = {
-    files: 0,
-    violations: 0,
-    rules: {},
-    error: null,
-  };
-
-  const bin = fileURLToPath(
-    new URL("../node_modules/oxlint/bin/oxlint", import.meta.url),
-  );
-
-  for (let start = 0; start < files.length; start += 100) {
-    const batch = files.slice(start, start + 100);
-
-    const child = spawnSync(
-      process.execPath,
-      [
-        bin,
-        "-c",
-        config,
-        "--disable-nested-config",
-        "--no-error-on-unmatched-pattern",
-        "-f",
-        "json",
-        "--",
-        ...batch,
-      ],
-      { cwd: repo.root, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 },
-    );
-
-    if (child.error) throw child.error;
-
-    const report = z
-      .object({
-        number_of_files: z.number(),
-        diagnostics: z.array(
-          z.object({
-            message: z.string(),
-            filename: z.string(),
-            code: z.string().optional(),
-          }),
-        ),
-      })
-      .parse(JSON.parse(child.stdout));
-
-    if (child.status !== 0 && !report.diagnostics.length)
-      throw Error(child.stderr || "Oxlint failed");
-    result.files += report.number_of_files;
-    result.violations += report.diagnostics.length;
-
-    for (const item of report.diagnostics) {
-      const key = item.code ?? "diagnostic";
-      result.rules[key] = (result.rules[key] ?? 0) + 1;
-      console.error(item.filename, item.code, item.message);
-    }
-  }
-
-  return result;
-}
 
 function nativeChecks(repo: Repo, settings: Targets) {
   const commands = settings.linters
@@ -199,6 +74,8 @@ export async function projectCheck(repo: Repo, note: string) {
 
   const start = fingerprint(repo);
 
+  const patterns = capturePatterns(repo, start);
+
   const run: CheckRun = {
     at: new Date().toISOString(),
     note,
@@ -216,7 +93,8 @@ export async function projectCheck(repo: Repo, note: string) {
       ]),
     ),
     run: null,
-    lint: lintMetrics(repo, settings),
+    lint: patterns.lint,
+    patternSnapshot: patterns.id,
     tools: nativeChecks(repo, settings),
     trials: repo.config.experiments?.map((spec) => runTrial(repo.root, spec)),
     tests: "unconfigured",

@@ -29,7 +29,7 @@ mkdir -p "$release/.agents"
 cp -R LICENSE THIRD_PARTY_NOTICES.md dist dashboard languages .oxlintrc.json package.json package-lock.json "$release/"
 mkdir -p "$release/tools/oxlint" "$release/scripts"
 cp -R tools/oxlint/anti-slop "$release/tools/oxlint/"
-cp scripts/ensure-service.sh scripts/connect-clients.sh scripts/opencode-config.mjs "$release/scripts/"
+cp scripts/dashboard.mjs scripts/ensure-service.sh scripts/connect-clients.sh scripts/opencode-config.mjs "$release/scripts/"
 cp -R .agents/skills "$release/.agents/"
 (cd "$release" && npm ci --omit=dev --no-audit --no-fund)
 previous=$(readlink "$data/current" || true)

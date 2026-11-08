@@ -561,3 +561,38 @@ test("accessibility MCP preserves a dirty baseline, reports known results separa
     /Unknown accessibility snapshot/,
   );
 });
+
+test("MCP pages a pinned language scan without invoking another lint run", async (t) => {
+  const root = fixture(t);
+  writeFileSync(
+    join(root, "tsconfig.json"),
+    '{"compilerOptions":{"strict":true}}',
+  );
+  writeFileSync(
+    join(root, "a.ts"),
+    "export function work(){Promise.resolve(1);Promise.resolve(2);}",
+  );
+  const c = await connect(t, root);
+  const first = await call(c, "scan_code_patterns", { limit: 1 });
+  assert.match(first.snapshot, /^[a-f0-9]{64}$/);
+  assert.ok(first.total > 0);
+  writeFileSync(join(root, "a.ts"), "export const changed = 42;");
+
+  const pinned = await call(c, "scan_code_patterns", {
+    snapshot: first.snapshot,
+    limit: 1,
+  });
+
+  assert.equal(pinned.total, first.total);
+  assert.equal(pinned.items[0].excerpt, first.items[0].excerpt);
+  assert.equal(pinned.items[0].symbol, "work");
+
+  const next = await call(c, "scan_code_patterns", {
+    snapshot: first.snapshot,
+    offset: first.nextOffset,
+    limit: 1,
+  });
+
+  assert.equal(next.items[0].symbol, "work");
+  assert.notEqual(next.items[0].column, first.items[0].column);
+});

@@ -35,6 +35,7 @@
     "jsdom": "27.4.0",
     "jsonc-parser": "3.3.1",
     "oxlint": "1.92.0",
+    "oxlint-tsgolint": "7.0.2006",
     "parse5": "7.3.0",
     "web-tree-sitter": "0.27.2",
     "zod": "4.6.7"
