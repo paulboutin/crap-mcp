@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { Projects, projectReport, sharedServer } from "./projects.ts";
+import { checkReport } from "./check-report.ts";
 import { reportHtml } from "./report-html.ts";
 
 export function machineApp(projects: Projects) {
@@ -96,6 +97,19 @@ export function machineApp(projects: Projects) {
       res.status(409).json({ error: String(error) });
     }
   });
+  app.get("/checks/:project/:at", (req, res) => {
+    try {
+      res
+        .type("html")
+        .send(
+          reportHtml(
+            checkReport(projects.repo(req.params.project), req.params.at),
+          ),
+        );
+    } catch (error) {
+      res.status(404).type("text").send(String(error));
+    }
+  });
   app.get("/report/:project", async (req, res) => {
     try {
       const baseline = req.query.snapshot;
@@ -104,7 +118,16 @@ export function machineApp(projects: Projects) {
         .type("html")
         .send(
           reportHtml(
-            await projectReport(projects.desk(req.params.project), id),
+            await projectReport(
+              projects.desk(req.params.project),
+              id,
+              req.query.securitySnapshot === undefined
+                ? undefined
+                : String(req.query.securitySnapshot),
+              req.query.accessibilitySnapshot === undefined
+                ? undefined
+                : String(req.query.accessibilitySnapshot),
+            ),
           ),
         );
     } catch (error) {

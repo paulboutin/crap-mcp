@@ -3,19 +3,28 @@ import type { Health, Finding } from "./findings.ts";
 import type { Delta } from "./review.ts";
 import type { Snapshot } from "./scan.ts";
 
-type Row = Health & { findings: Finding[] };
+import type { FindingDetail } from "./finding-detail.ts";
+
+type Contribution = ReturnType<
+  typeof import("./session.ts").sessionContribution
+>;
+
+type Row = Health & { findings: Finding[]; detail?: FindingDetail };
 
 interface Review {
   summary?: ReturnType<typeof import("./session.ts").sessionSummary>;
   ref: string;
   commit: string;
   affected: number;
+  contributions?: Contribution[];
   unassessed: string[];
   deltas: Delta[];
 }
 
 export interface Report {
   evidence?: ReturnType<typeof import("./project-learning.ts").projectEvidence>;
+  accessibility?: import("./accessibility.ts").AccessibilityReport;
+  security?: import("./security.ts").SecurityReport;
   repository: string;
   functions: Row[];
   snapshot: Omit<Snapshot, "rows" | "churn"> & { functions: number };
@@ -46,6 +55,50 @@ function details(doc: Document, title: string) {
   group.append(element(doc, "summary", title));
 
   return group;
+}
+
+function where(d: FindingDetail) {
+  if (!d.line) return d.file;
+
+  return d.file + ":" + d.line + (d.end && d.end !== d.line ? "–" + d.end : "");
+}
+
+function field(doc: Document, list: HTMLElement, label: string, value: string) {
+  list.append(element(doc, "dt", label), element(doc, "dd", value));
+}
+
+function findingDetails(
+  doc: Document,
+  title: string,
+  d: FindingDetail,
+  evidence?: string,
+) {
+  const group = details(doc, title);
+  group.className = "finding";
+  const list = doc.createElement("dl");
+  field(doc, list, "Location", where(d));
+
+  if (evidence) field(doc, list, "Evidence", evidence);
+  field(doc, list, "Why it appears", d.why);
+  field(doc, list, "Potential impact", d.impact);
+  field(doc, list, "Effect on the score", d.scoring);
+  field(doc, list, "How to address it", d.action);
+  field(doc, list, "How to verify", d.check);
+  group.append(list);
+
+  if (d.excerpt) group.append(element(doc, "pre", d.excerpt));
+  else if (d.line)
+    group.append(
+      element(doc, "small", "This snapshot has line references only."),
+    );
+
+  return group;
+}
+
+function listEntry(doc: Document, list: HTMLElement, entry: HTMLElement) {
+  const item = doc.createElement("li");
+  item.append(entry);
+  list.append(item);
 }
 
 function summary(doc: Document, r: Report) {
@@ -101,6 +154,33 @@ function evidence(doc: Document, r: Report) {
     );
 }
 
+function deltaDetail(doc: Document, row: Delta) {
+  const change = details(
+    doc,
+    row.symbol + " · " + (row.after ?? row.before)!.rule,
+  );
+
+  if (row.before)
+    change.append(
+      findingDetails(
+        doc,
+        "Baseline · " + where(row.before.detail),
+        row.before.detail,
+      ),
+    );
+
+  if (row.after)
+    change.append(
+      findingDetails(
+        doc,
+        "Current · " + where(row.after.detail),
+        row.after.detail,
+      ),
+    );
+
+  return change;
+}
+
 function patch(doc: Document, review: Review | null) {
   if (!review) {
     byId(doc, "diffmeta").textContent = "No starting revision is available.";
@@ -129,18 +209,10 @@ function patch(doc: Document, review: Review | null) {
     const group = details(doc, rows.length + " " + status),
       list = doc.createElement("ul");
 
-    for (const row of rows)
-      list.append(
-        element(
-          doc,
-          "li",
-          row.file +
-            " · " +
-            row.symbol +
-            " · " +
-            (row.after ?? row.before)?.rule,
-        ),
-      );
+    for (const row of rows) {
+      listEntry(doc, list, deltaDetail(doc, row));
+    }
+
     group.append(list);
     byId(doc, "deltas").append(group);
   }
@@ -189,8 +261,11 @@ function describe(doc: Document, h: Row) {
       element(doc, "p", "Uncovered lines: " + h.coverage.uncovered.join(", ")),
     );
 
+  if (h.detail)
+    group.append(findingDetails(doc, "How this function scored", h.detail));
+
   for (const f of h.findings)
-    group.append(element(doc, "p", f.reason + " " + f.action + " " + f.check));
+    group.append(findingDetails(doc, f.rule + " · " + f.value, f.detail));
 
   return group;
 }
@@ -287,8 +362,49 @@ function explorer(doc: Document, functions: Row[]) {
   draw();
 }
 
+function sessionRows(doc: Document, rows: Contribution[]) {
+  const list = byId(doc, "session-functions");
+
+  for (const r of rows) {
+    const c = r.credits;
+
+    const points = c
+      ? Object.entries(c)
+          .map(
+            ([key, v]) =>
+              key +
+              " " +
+              (v === null
+                ? "unmeasured"
+                : Number((2.5 * v).toFixed(3)) + "/2.5"),
+          )
+          .join(" · ")
+      : "Removed function. Excluded from the session average.";
+
+    const score = (v?: number | null) =>
+      v === undefined ? "absent" : v === null ? "unrated" : v.toFixed(2);
+
+    listEntry(
+      doc,
+      list,
+      findingDetails(
+        doc,
+        r.symbol + " · " + where(r.detail),
+        {
+          ...r.detail,
+          scoring: points,
+        },
+        "Function CRAP " + score(r.before) + " → " + score(r.after),
+      ),
+    );
+  }
+}
+
 function scorePanel(doc: Document, r: Report) {
   const summary = r.review?.summary;
+  const contributions = r.review?.contributions ?? [];
+  byId(doc, "session-breakdown").hidden = !contributions.length;
+  sessionRows(doc, contributions);
   byId(doc, "session-score").textContent =
     summary?.rating ?? "No session comparison";
   byId(doc, "score-scope").textContent = summary
@@ -404,7 +520,340 @@ function projectHistory(doc: Document, r: Report) {
   }
 }
 
-export function renderReport(doc: Document, r: Report) {
+function sourceChange(
+  doc: Document,
+  list: HTMLElement,
+  group: string,
+  title: string,
+  d: FindingDetail,
+  context: string,
+) {
+  listEntry(
+    doc,
+    list,
+    findingDetails(
+      doc,
+      group + " · " + title + " · " + where(d),
+      d,
+      (group === "resolved" ? "Baseline snapshot" : "Current snapshot") +
+        " · " +
+        context,
+    ),
+  );
+}
+
+function securityChanges(doc: Document, scan: NonNullable<Report["security"]>) {
+  const comparison = scan.comparison;
+
+  if (!comparison?.comparable) return;
+
+  for (const group of ["introduced", "resolved"] as const) {
+    for (const f of comparison[group]) {
+      const rule = scan.catalog[f.rule];
+      sourceChange(
+        doc,
+        byId(doc, "security-deltas"),
+        group,
+        rule.title,
+        f.detail,
+        rule.category + " · " + rule.cwe,
+      );
+    }
+  }
+}
+
+function securityPanel(doc: Document, r: Pick<Report, "security">) {
+  const scan = r.security;
+
+  if (!scan) return;
+  byId(doc, "security-score").textContent =
+    "Source security · " + scan.headline;
+  byId(doc, "security-detail").textContent =
+    scan.detail + " · " + scan.rules.length + " enabled source checks";
+  byId(doc, "security-change").textContent = scan.comparisonText;
+  securityChanges(doc, scan);
+
+  for (const id of scan.rules) {
+    const rule = scan.catalog[id];
+    byId(doc, "security-rules").append(
+      element(
+        doc,
+        "li",
+        rule.title + " · " + rule.category + " · " + rule.severity,
+      ),
+    );
+  }
+
+  const list = byId(doc, "security-findings");
+
+  for (const finding of scan.findings) {
+    const rule = scan.catalog[finding.rule];
+    listEntry(
+      doc,
+      list,
+      findingDetails(
+        doc,
+        rule.severity + " · " + rule.title + " · " + where(finding.detail),
+        finding.detail,
+        rule.category + " · " + rule.cwe + " · " + finding.id,
+      ),
+    );
+  }
+
+  for (const gap of scan.skipped)
+    list.append(element(doc, "li", gap.file + ": " + gap.reason));
+
+  if (!list.childElementCount)
+    list.append(element(doc, "li", "No enabled patterns matched."));
+}
+
+function colorPanel(doc: Document, scan: NonNullable<Report["accessibility"]>) {
+  const c = scan.colorblind;
+  const value = c.score === null ? "Unrated" : c.score + "/100";
+  const prior = scan.comparison?.colorblindScore;
+  byId(doc, "colorblind-score").textContent =
+    "Colorblind score · " +
+    (prior == null ? "" : prior + "/100 → ") +
+    value +
+    " · " +
+    c.passed +
+    "/" +
+    c.measured +
+    " measured pairs pass all three simulations · " +
+    c.pending +
+    " need review";
+
+  colorSamples(doc, "access-colors", scan.colors);
+  const baseline = scan.comparison?.baselineColors ?? [];
+  byId(doc, "baseline-pairs").hidden = !baseline.length;
+  colorSamples(doc, "baseline-colors", baseline);
+}
+
+function colorSamples(
+  doc: Document,
+  id: string,
+  colors: NonNullable<Report["accessibility"]>["colors"],
+) {
+  const samples = [...colors].sort(
+    (a, b) =>
+      Number(Boolean(b.failedProfiles.length)) -
+      Number(Boolean(a.failedProfiles.length)),
+  );
+
+  for (const sample of samples) {
+    listEntry(
+      doc,
+      byId(doc, id),
+      findingDetails(
+        doc,
+        sample.status + " · " + sample.element + " · " + where(sample.detail),
+        sample.detail,
+      ),
+    );
+  }
+}
+
+function accessibilityPanel(doc: Document, r: Pick<Report, "accessibility">) {
+  const scan = r.accessibility;
+
+  if (!scan) return;
+  colorPanel(doc, scan);
+  byId(doc, "access-score").textContent = "Accessibility · " + scan.headline;
+  byId(doc, "access-detail").textContent = [
+    scan.reason,
+    scan.detail,
+    scan.scope,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  byId(doc, "access-change").textContent = scan.comparisonText;
+
+  for (const id of scan.rules) {
+    const rule = scan.catalog[id];
+    byId(doc, "access-rules").append(
+      element(
+        doc,
+        "li",
+        rule.title + " · " + rule.category + " · " + rule.section508,
+      ),
+    );
+  }
+
+  const passes = byId(doc, "access-passes");
+
+  for (const f of scan.passedChecks) {
+    const rule = scan.catalog[f.rule];
+    listEntry(
+      doc,
+      passes,
+      findingDetails(
+        doc,
+        rule.title + " · " + where(f.detail),
+        f.detail,
+        rule.category + " · " + rule.section508,
+      ),
+    );
+  }
+
+  if (scan.passed > scan.passedChecks.length)
+    passes.textContent = "This snapshot retained the pass count only.";
+  const list = byId(doc, "access-findings");
+
+  for (const f of [...scan.findings, ...scan.pending]) {
+    const rule = scan.catalog[f.rule];
+    listEntry(
+      doc,
+      list,
+      findingDetails(
+        doc,
+        f.status + " · " + rule.title + " · " + where(f.detail),
+        f.detail,
+        rule.category + " · " + rule.section508 + " · " + f.id,
+      ),
+    );
+  }
+
+  for (const gap of scan.skipped)
+    list.append(element(doc, "li", gap.file + ": " + gap.reason));
+
+  if (!list.childElementCount)
+    list.append(
+      element(doc, "li", "No recorded findings or pending source checks."),
+    );
+
+  if (scan.comparison?.comparable)
+    renderAccessibilityChanges(doc, scan.comparison, scan.catalog);
+}
+
+function renderAccessibilityChanges(
+  doc: Document,
+  comparison: NonNullable<NonNullable<Report["accessibility"]>["comparison"]>,
+  catalog: NonNullable<Report["accessibility"]>["catalog"],
+) {
+  for (const group of ["introduced", "resolved"] as const)
+    for (const f of comparison[group])
+      sourceChange(
+        doc,
+        byId(doc, "access-deltas"),
+        group,
+        catalog[f.rule].title,
+        f.detail,
+        catalog[f.rule].category,
+      );
+}
+
+type RecordedCheck = import("./check-report.ts").CheckReport;
+
+function checkTargets(doc: Document, r: RecordedCheck, rows: Row[]) {
+  const panel = byId(doc, "check-targets");
+  panel.hidden = false;
+  const targets = r.thresholds;
+
+  if (!targets) {
+    byId(doc, "target-count").textContent =
+      "This check predates saved threshold values.";
+
+    return;
+  }
+
+  const list = byId(doc, "target-findings");
+
+  for (const h of rows) {
+    const why = [];
+
+    if (h.score !== null && h.score > targets.maxCrap)
+      why.push(
+        "CRAP " +
+          h.score.toFixed(2) +
+          " exceeded the configured maximum of " +
+          targets.maxCrap +
+          ".",
+      );
+
+    if (h.coverage.percent !== null && h.coverage.percent < targets.minCoverage)
+      why.push(
+        "Coverage " +
+          h.coverage.percent.toFixed(1) +
+          "% was below the configured minimum of " +
+          targets.minCoverage +
+          "%.",
+      );
+
+    if (why.length && h.detail)
+      listEntry(
+        doc,
+        list,
+        findingDetails(doc, h.symbol + " · " + where(h.detail), {
+          ...h.detail,
+          why: why.join(" "),
+          impact:
+            "Changes on less-tested paths may produce regressions that the designated suite misses.",
+          scoring: "This function exceeded a project check threshold.",
+        }),
+      );
+  }
+
+  byId(doc, "target-count").textContent =
+    list.childElementCount + " functions outside the recorded thresholds.";
+}
+
+function recordedCheck(doc: Document, r: RecordedCheck) {
+  doc.querySelector("h1")!.textContent = "Recorded project check";
+  byId(doc, "repo").textContent = r.repository;
+  byId(doc, "meta").textContent = r.check + " · " + r.note;
+  byId(doc, "scan-status").textContent = r.outcome;
+
+  for (const selector of [".session", ".cards", ".strip", ".footgrid"])
+    doc.querySelector(selector)?.remove();
+  const rows = r.code.data;
+
+  if (rows) {
+    checkTargets(doc, r, rows);
+    explorer(doc, rows);
+  } else {
+    byId(doc, "function-panel").textContent =
+      r.code.error ?? "Function evidence unavailable.";
+  }
+
+  if (r.access.data) accessibilityPanel(doc, { accessibility: r.access.data });
+  else byId(doc, "access-detail").textContent = r.access.error ?? "";
+
+  if (r.security.data) securityPanel(doc, { security: r.security.data });
+  else byId(doc, "security-detail").textContent = r.security.error ?? "";
+}
+
+export type SourceReport = Pick<Report, "security" | "accessibility"> & {
+  sourceSnapshot: string;
+};
+
+function standaloneSource(doc: Document, r: SourceReport) {
+  const id = r.security ? "security-score" : "access-score";
+  const section = byId(doc, id).closest("section")!;
+
+  for (const panel of doc.querySelectorAll("main > :not(.intro)")) {
+    if (panel !== section) panel.remove();
+  }
+
+  doc.querySelector("h1")!.textContent = r.security
+    ? "Application security findings"
+    : "Accessibility findings";
+  byId(doc, "meta").textContent = "Snapshot " + r.sourceSnapshot;
+  byId(doc, "scan-status").remove();
+  securityPanel(doc, r);
+  accessibilityPanel(doc, r);
+}
+
+export function renderReport(
+  doc: Document,
+  r: Report | RecordedCheck | SourceReport,
+) {
+  if ("sourceSnapshot" in r) return standaloneSource(doc, r);
+
+  if ("check" in r) return recordedCheck(doc, r);
+  byId(doc, "security-score").closest("section")!.hidden = !r.security;
+  byId(doc, "access-score").closest("section")!.hidden = !r.accessibility;
+  accessibilityPanel(doc, r);
+  securityPanel(doc, r);
   projectHistory(doc, r);
   scorePanel(doc, r);
   gaps(doc, r.functions);

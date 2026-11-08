@@ -381,3 +381,28 @@ footer {
 .session ul:empty {
   display: none;
 }
+
+.finding {
+  margin-block: .4rem;
+  overflow-wrap: anywhere;
+}
+.finding summary { padding-block: .25rem; }
+.finding dl {
+  display: grid;
+  grid-template-columns: minmax(7em, auto) minmax(0, 1fr);
+  gap: .4rem 1rem;
+  margin: .75rem 0;
+}
+.finding dt { font-weight: 650; }
+.finding dd { margin: 0; }
+.finding pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: .75rem;
+  background: #f4f6f3;
+  color: #172f36;
+}
+@media (max-width: 600px) {
+  .finding dl { display: block; }
+  .finding dd { margin-bottom: .6rem; }
+}

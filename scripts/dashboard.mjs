@@ -1,3 +1,5 @@
+import { dashboardAccessibility } from "../dist/accessibility.js";
+import { dashboardSecurity } from "../dist/security.js";
 import { projectEvidence } from "../dist/project-learning.js";
 import { repository } from "../dist/files.js";
 import { reportHtml } from "../dist/report-html.js";
@@ -66,7 +68,8 @@ async function diffReport(snapshot) {
     "Working tree changed during report; regenerate",
   );
   const deltas = [...first.findings.items];
-  let next = first.findings.nextOffset;
+  const contributions = first.affected.items.map((p) => p.contribution);
+  let next = first.findings.nextOffset ?? first.affected.nextOffset;
 
   while (next !== null) {
     const page = await call("review_changes", {
@@ -81,7 +84,8 @@ async function diffReport(snapshot) {
       "Working tree changed during report; regenerate",
     );
     deltas.push(...page.findings.items);
-    next = page.findings.nextOffset;
+    contributions.push(...page.affected.items.map((p) => p.contribution));
+    next = page.findings.nextOffset ?? page.affected.nextOffset;
   }
 
   return {
@@ -89,6 +93,7 @@ async function diffReport(snapshot) {
     summary: first.summary,
     commit: first.baseline.commit ?? first.baseline.id,
     affected: first.affected.total,
+    contributions,
     unassessed: first.unassessed,
     deltas,
   };
@@ -108,9 +113,23 @@ try {
   const report = await scanReport(),
     review = await diffReport(report.snapshot);
 
+  const repo = repository(root);
+
+  const security = dashboardSecurity(
+    repo,
+    process.env.SECURITY_SNAPSHOT,
+    process.env.CRAP_BASE ?? report.snapshot.commit,
+  );
+
   const html = reportHtml({
+    accessibility: dashboardAccessibility(
+      repo,
+      process.env.ACCESSIBILITY_SNAPSHOT,
+      process.env.CRAP_BASE ?? report.snapshot.commit,
+    ),
+    security,
     repository: basename(root),
-    evidence: projectEvidence(repository(root)),
+    evidence: projectEvidence(repo),
     ...report,
     review,
   });

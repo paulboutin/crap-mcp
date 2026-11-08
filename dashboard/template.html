@@ -12,9 +12,7 @@ REPORT_LICENSE
     />
     <meta name="color-scheme" content="light" />
     <title>Repository health · CRAP Score</title>
-    <style>
-      /* REPORT_CSS */
-    </style>
+    <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <header>
@@ -53,6 +51,31 @@ REPORT_LICENSE
           </p>
         </details>
         <ul id="score-examples"></ul>
+        <details id="session-breakdown"><summary>Score by changed function</summary><ul id="session-functions"></ul></details>
+      </section>
+      <section class="panel" aria-label="Application security">
+        <small class="eyebrow">APPLICATION SECURITY · HIGHER IS BETTER</small>
+        <h2 id="security-score">No security scan available</h2>
+        <p id="security-detail"></p><p id="security-change"></p><details><summary>Finding changes since baseline</summary><ul id="security-deltas"></ul></details>
+        <details><summary>Scope and scoring</summary>
+          <p>AppSec v1 starts at 100 and subtracts 25 per high and 10 per medium finding, down to zero. This local score covers the enabled source patterns in JavaScript, TypeScript, JSX, TSX and Swift. Unassessed candidate files prevent a grade. A clean scan does not verify access control, dependencies, deployment settings or OWASP compliance.</p>
+          <ul id="security-rules"></ul>
+        </details>
+        <details><summary>Findings and unassessed files</summary><ul id="security-findings"></ul></details>
+      </section>
+      <section class="panel" aria-label="Accessibility">
+        <h2 id="access-score">Accessibility · no scan available</h2>
+        <p id="access-detail"></p><p id="access-change"></p><details><summary>Finding changes since baseline</summary><ul id="access-deltas"></ul></details>
+        <p id="colorblind-score"></p><details><summary>Contrast and color vision evidence</summary>
+        <p>The colorblind score is the percentage of measured text and configured palette pairs meeting the contrast threshold under protanopia, deuteranopia and tritanopia simulations. Check that charts, errors and selected states also use text, shapes or icons to convey meaning.</p>
+        <ul id="access-colors"></ul>
+        <details id="baseline-pairs"><summary>Baseline color pairs</summary><ul id="baseline-colors"></ul></details></details>
+        <details><summary>Passed accessibility checks</summary><ul id="access-passes"></ul></details>
+        <details><summary>Findings and manual reviews</summary><ul id="access-findings"></ul></details>
+        <details><summary>Scope, scoring and standards</summary>
+          <p>Percentage of evaluated source checks that passed, rounded down. Dynamic values need review. A skipped file or zero evaluated checks leaves the score unrated. Verify keyboard use, contrast, focus order, alternative text quality and screen reader behavior in the running interface.</p>
+          <ul id="access-rules"></ul>
+        </details>
       </section>
       <div class="cards" aria-label="Repository metrics">
         <article>
@@ -80,7 +103,11 @@ REPORT_LICENSE
         ></progress>
         <p id="gaps"></p>
       </section>
-      <section class="panel">
+      <section class="panel" id="check-targets" hidden>
+        <h2>Project thresholds</h2><p id="target-count"></p>
+        <details><summary>Functions outside the project thresholds</summary><ul id="target-findings"></ul></details>
+      </section>
+      <section class="panel" id="function-panel">
         <div class="section-head">
           <div>
             <small class="eyebrow">CODE INVENTORY</small>

@@ -245,8 +245,11 @@ export function supported(file: string, packs: string[] = []) {
 }
 
 export function eligible(repo: Repo, file: string) {
+  return supported(file, repo.packs) && inScope(repo, file);
+}
+
+export function inScope(repo: Repo, file: string) {
   return (
-    supported(file, repo.packs) &&
     !omitted(repo, file) &&
     !file
       .split("/")

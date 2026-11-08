@@ -1,3 +1,5 @@
+import { accessibilityCheck } from "./accessibility.ts";
+import { securityCheck } from "./security.ts";
 import { runTrial } from "./experiments.ts";
 import { adapter } from "./languages.ts";
 import { spawnSync } from "node:child_process";
@@ -158,7 +160,18 @@ function outcome(run: CheckRun): CheckRun["outcome"] {
   if (run.lint.error || run.lint.violations || run.tests === "failed")
     return "failed";
 
-  return metricOutcome(run.metrics);
+  const sourceChecks = [
+    run.security?.status,
+    run.accessibility?.status,
+    run.accessibility?.colorblindStatus,
+  ];
+
+  if (sourceChecks.includes("failed")) return "failed";
+  const metrics = metricOutcome(run.metrics);
+
+  return metrics === "passed" && sourceChecks.includes("incomplete")
+    ? "incomplete"
+    : metrics;
 }
 
 function metricOutcome(m: CheckRun["metrics"]): CheckRun["outcome"] {
@@ -174,16 +187,30 @@ function metricOutcome(m: CheckRun["metrics"]): CheckRun["outcome"] {
 export async function projectCheck(repo: Repo, note: string) {
   const { settings } = qualityPolicy(repo);
 
+  const {
+    accessibilityRules: _accessibilityRules,
+    accessibilityPalette: _palette,
+    minColorblindScore: _colorTarget,
+    minAccessibilityScore: _accessibilityTarget,
+    securityRules: _securityRules,
+    minSecurityScore: _target,
+    ...checkSettings
+  } = settings;
+
   const start = fingerprint(repo);
 
   const run: CheckRun = {
     at: new Date().toISOString(),
     note,
+    thresholds: {
+      maxCrap: settings.maxCrap,
+      minCoverage: settings.minCoverage,
+    },
     commit: maybeRevision(repo.root, "HEAD"),
     suite: repo.config.suite,
     policy: digest(
       JSON.stringify([
-        settings,
+        checkSettings,
         repo.config,
         ...repo.packs.map((id) => adapter(id).version),
       ]),
@@ -228,6 +255,12 @@ export async function projectCheck(repo: Repo, note: string) {
     }
   }
 
+  run.accessibility = accessibilityCheck(
+    repo,
+    settings.minAccessibilityScore,
+    settings.minColorblindScore,
+  );
+  run.security = securityCheck(repo, settings.minSecurityScore);
   run.outcome = outcome(run);
   saveRun(repo, run);
 

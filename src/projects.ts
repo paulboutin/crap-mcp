@@ -1,3 +1,5 @@
+import { dashboardAccessibility } from "./accessibility.ts";
+import { dashboardSecurity } from "./security.ts";
 import {
   applyPolicy,
   edit,
@@ -11,13 +13,12 @@ import {
   recordLearning,
 } from "./project-learning.ts";
 import { recentRuns } from "./check-history.ts";
-import { basename, isAbsolute, join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { z } from "zod";
 import { digest, readJson, repository, writeJson } from "./files.ts";
 import { analysisServer, Desk } from "./service.ts";
-import { findings } from "./findings.ts";
+import { codeReport, comparisonReport } from "./code-report.ts";
 import { review } from "./review.ts";
-import { sessionSummary } from "./session.ts";
 import type { Report } from "./report-view.ts";
 
 export class Projects {
@@ -183,29 +184,30 @@ export function sharedServer(projects: Projects) {
 export async function projectReport(
   desk: Desk,
   baseline?: string,
+  securitySnapshot?: string,
+  accessibilitySnapshot?: string,
 ): Promise<Report> {
   const current = await desk.current();
-  const { rows, churn: _churn, ...snapshot } = current;
 
   const report: Report = {
-    repository: basename(desk.repo.root),
+    ...codeReport(desk.repo.root, current),
+    accessibility: dashboardAccessibility(
+      desk.repo,
+      accessibilitySnapshot,
+      current.commit,
+    ),
+    security: dashboardSecurity(desk.repo, securitySnapshot, current.commit),
     evidence: projectEvidence(desk.repo),
-    snapshot: { ...snapshot, functions: rows.length },
-    functions: rows.map((row) => ({ ...row, findings: findings(row) })),
-    review: null,
   };
 
   if (!current.commit && !baseline) return report;
   const base = baseline ? desk.base(undefined, baseline) : desk.base("HEAD");
   const changes = review(base, current);
-  report.review = {
-    ref: baseline ? "task snapshot " + baseline.slice(0, 12) : "HEAD",
-    commit: base.commit ?? base.id,
-    summary: sessionSummary(changes),
-    affected: changes.affected.length,
-    unassessed: changes.unassessed,
-    deltas: changes.findings,
-  };
+  report.review = comparisonReport(
+    base,
+    changes,
+    baseline ? "task snapshot " + baseline.slice(0, 12) : "HEAD",
+  );
 
   return report;
 }

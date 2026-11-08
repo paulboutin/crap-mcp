@@ -1,7 +1,5 @@
 # CRAP Score MCP
 
-> **Documentation preview.** The security, accessibility, color vision and expanded finding reports described below require the updated MCP server. GitHub’s [base revision](https://github.com/paulboutin/crap-mcp/tree/697eadd31f07e0c1e38e4fe9c148de934268691e) ships the CRAP tools. This documentation branch contains the guides and skills only.
-
 **CRAP stands for Change Risk Anti-Patterns.** It estimates how risky a function is to change by combining the number of paths through its code (cyclomatic complexity) with how much of that code your tests execute. A function with many paths and little coverage is a good place to add a test before editing. [Background from the metric’s co-creator](https://testing.googleblog.com/2011/02/this-code-is-crap.html)
 
 This local **Model Context Protocol (MCP)** server lets your coding agent find those functions, capture a baseline, and show what changed after a patch. One service handles multiple checkouts. TypeScript, TSX and Swift work out of the box, with optional packs for other languages.

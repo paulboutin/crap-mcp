@@ -22,6 +22,7 @@ import { fingerprint, receipt, type Receipt } from "./coverage.ts";
 import { health, healthSchema } from "./findings.ts";
 import { parse, prepareLanguage, type Routine } from "./syntax.ts";
 
+import { sourceExcerpt } from "./finding-detail.ts";
 import { reconcile } from "./reconcile.ts";
 
 const skipped = z.object({ file: z.string(), reason: z.string() });
@@ -116,7 +117,23 @@ function inspect(
   if (cache.size >= 5000) cache.clear();
   cache.set(key, rows);
 
-  for (const r of rows) s.rows.push(health(r, file, s.input, s.suite, run));
+  const lines = source.split(/\r?\n/);
+
+  for (const r of rows) {
+    const h = health(r, file, s.input, s.suite, run);
+    h.excerpt = sourceExcerpt(lines, r.start, r.end);
+
+    if (h.depth >= 4)
+      h.deepestExcerpt = sourceExcerpt(lines, h.deepest, h.deepest);
+
+    if (h.coverage.uncovered.length && h.score !== null && h.score > 30)
+      h.uncoveredExcerpt = h.coverage.uncovered
+        .slice(0, 5)
+        .map((line) => sourceExcerpt(lines, line, line))
+        .join("\n");
+    s.rows.push(h);
+  }
+
   s.files++;
 }
 

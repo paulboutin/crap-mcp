@@ -1,3 +1,10 @@
+import { palettePairs } from "./color-contrast.ts";
+import {
+  accessibilityCatalog,
+  accessibilityIds,
+  accessibilityRule,
+} from "./accessibility-rules.ts";
+import { ruleId, securityCatalog, securityIds } from "./security-rules.ts";
 import { prepareLanguage } from "./syntax.ts";
 import { adapter, languages } from "./languages.ts";
 import { readFileSync } from "node:fs";
@@ -46,6 +53,32 @@ export const targets = z
     maxCrap: z.number().positive().max(1000000),
     minCoverage: z.number().min(0).max(100),
     rules: ruleList,
+    minColorblindScore: z.number().int().min(0).max(100).nullable().optional(),
+    accessibilityPalette: palettePairs.optional(),
+    minAccessibilityScore: z
+      .number()
+      .int()
+      .min(0)
+      .max(100)
+      .nullable()
+      .optional(),
+    accessibilityRules: z
+      .array(accessibilityRule)
+      .max(accessibilityIds.length)
+      .refine(
+        (ids) => new Set(ids).size === ids.length,
+        "Duplicate accessibility rules",
+      )
+      .optional(),
+    minSecurityScore: z.number().int().min(0).max(100).nullable().optional(),
+    securityRules: z
+      .array(ruleId)
+      .max(securityIds.length)
+      .refine(
+        (ids) => new Set(ids).size === ids.length,
+        "Duplicate security rules",
+      )
+      .optional(),
     omitDirectories: directories.default([]),
     packs: z
       .array(z.enum(languages.flatMap((l) => (l.core ? [] : [l.id]))))
@@ -134,6 +167,12 @@ export function qualityPolicy(repo: Repo) {
       maxCrap: 30,
       minCoverage: 0,
       rules: defaults,
+      securityRules: undefined,
+      accessibilityRules: undefined,
+      minAccessibilityScore: undefined,
+      accessibilityPalette: undefined,
+      minColorblindScore: undefined,
+      minSecurityScore: undefined,
       omitDirectories: [],
       packs: [],
       linters: [],
@@ -146,6 +185,8 @@ export function qualityPolicy(repo: Repo) {
     shared: Boolean(path),
     revision: digest(JSON.stringify(state)),
     catalog,
+    securityCatalog,
+    accessibilityCatalog,
     analysisExclusions: repo.config.exclude,
     languages: languages.map(({ id, core, extensions, bytes, linter }) => ({
       id,
@@ -162,7 +203,29 @@ export function updatePolicy(repo: Repo, input: z.infer<typeof edit>) {
 
   if (current.revision !== input.revision)
     throw Error("Settings changed. Reload before saving.");
-  const settings = input.settings;
+
+  const settings = {
+    ...input.settings,
+    minColorblindScore:
+      input.settings.minColorblindScore === undefined
+        ? current.settings.minColorblindScore
+        : input.settings.minColorblindScore,
+    accessibilityPalette:
+      input.settings.accessibilityPalette ??
+      current.settings.accessibilityPalette,
+    accessibilityRules:
+      input.settings.accessibilityRules ?? current.settings.accessibilityRules,
+    minAccessibilityScore:
+      input.settings.minAccessibilityScore === undefined
+        ? current.settings.minAccessibilityScore
+        : input.settings.minAccessibilityScore,
+    minSecurityScore:
+      input.settings.minSecurityScore === undefined
+        ? current.settings.minSecurityScore
+        : input.settings.minSecurityScore,
+    securityRules:
+      input.settings.securityRules ?? current.settings.securityRules,
+  };
 
   if (JSON.stringify(settings) === JSON.stringify(current.settings))
     return current;
@@ -197,6 +260,22 @@ export function updatePolicy(repo: Repo, input: z.infer<typeof edit>) {
 function enabled(settings: Targets) {
   return [
     ...settings.rules,
+    ...(settings.minColorblindScore == null
+      ? []
+      : ["colorblind/target:" + settings.minColorblindScore]),
+    ...(settings.accessibilityPalette ?? []).map(
+      (p) => "palette/" + p.label + " " + p.first + " " + p.second,
+    ),
+    ...(settings.minAccessibilityScore == null
+      ? []
+      : ["accessibility/target:" + settings.minAccessibilityScore]),
+    ...(settings.accessibilityRules ?? accessibilityIds).map(
+      (id) => "accessibility/" + id,
+    ),
+    ...(settings.minSecurityScore == null
+      ? []
+      : ["security/target:" + settings.minSecurityScore]),
+    ...(settings.securityRules ?? securityIds).map((id) => "security/" + id),
     ...settings.omitDirectories.map((path) => "omit/" + path),
     ...settings.packs.map((id) => "pack/" + id),
     ...settings.linters.map((id) => "linter/" + id),
