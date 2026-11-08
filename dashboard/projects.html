@@ -97,17 +97,44 @@
       >
     </nav>
     <p id="status" role="status">Loading projects…</p>
-    <iframe title="Selected project health" hidden></iframe>
+    <iframe id="saved" title="Last saved function scan" hidden></iframe>
+    <iframe id="current" title="Selected project health" hidden></iframe>
     <script type="module">
       const select = document.querySelector("select");
-      const frame = document.querySelector("iframe");
+      const frame = document.querySelector("#current");
       const status = document.querySelector("#status");
       const query = new URLSearchParams(location.search);
+      function loadReport(report) {
+        const saved = document.querySelector("#saved");
+        status.textContent = "Loading the current project report…";
+        const preview = new URL(report);
+        preview.searchParams.set("preview", "saved");
+        let failed = false;
+        saved.onload = () => {
+          if (frame.hidden && saved.contentDocument?.getElementById("range")?.textContent) {
+            saved.hidden = false;
+            if (!failed) status.textContent = "Showing the last saved function scan while the current report loads…";
+          }
+        };
+        const timer = setTimeout(() => { saved.src = preview.href; }, 1000);
+        frame.onload = () => {
+          if (frame.contentDocument?.URL === "about:blank") return;
+          clearTimeout(timer);
+          if (!frame.contentDocument?.getElementById("range")?.textContent) {
+            status.textContent = "Could not load the current report. " +
+              (frame.contentDocument?.querySelector("pre")?.textContent || "Reload to try again.");
+            failed = true;
+            return;
+          }
+          saved.remove();
+          frame.hidden = false;
+          status.hidden = true;
+        };
+        frame.src = report.href;
+      }
       function display() {
         const id = query.get("project") || select.options[0]?.value;
         select.value = id ?? "";
-        frame.hidden = !select.value;
-        status.hidden = Boolean(select.value);
         if (!select.value) {
           status.textContent = select.options.length
             ? "This project is unavailable. Choose a registered project."
@@ -130,9 +157,11 @@
         link.href = next;
         link.hidden = false;
         frame.title = settings ? "Project settings" : "Selected project health";
-        frame.src = settings
-          ? "/settings?project=" + encodeURIComponent(id)
-          : report.href;
+        if (settings) {
+          status.hidden = true;
+          frame.hidden = false;
+          frame.src = "/settings?project=" + encodeURIComponent(id);
+        } else loadReport(report);
       }
       try {
         const response = await fetch("/projects");

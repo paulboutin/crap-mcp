@@ -30,10 +30,11 @@ export class Desk {
   latest: Snapshot | undefined;
   active: Promise<Snapshot> | undefined;
   error: string | null = null;
-  constructor(repo: Repo) {
+  constructor(repo: Repo, startScan = true) {
     this.repo = repo;
     this.latest = last(repo);
-    this.background();
+
+    if (startScan) this.background();
   }
   background() {
     void this.refresh().catch((error) => {
@@ -62,6 +63,7 @@ export class Desk {
 
     if (
       s &&
+      s.policy === policy(this.repo) &&
       s.input === fingerprint(this.repo) &&
       s.run === (receipt(this.repo)?.run ?? null) &&
       s.commit === maybeRevision(this.repo.root, "HEAD")

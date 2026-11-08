@@ -6,12 +6,14 @@ import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { Projects, projectReport, sharedServer } from "./projects.ts";
+import { Projects, sharedServer } from "./projects.ts";
 import { checkReport } from "./check-report.ts";
 import { reportHtml } from "./report-html.ts";
+import { machineReports } from "./machine-reports.ts";
 
 export function machineApp(projects: Projects) {
   const app = createMcpExpressApp();
+  const report = machineReports();
   app.use((req, res, next) => {
     res.set("Cache-Control", "no-store");
     res.set("X-Content-Type-Options", "nosniff");
@@ -112,24 +114,21 @@ export function machineApp(projects: Projects) {
   });
   app.get("/report/:project", async (req, res) => {
     try {
-      const baseline = req.query.snapshot;
-      const id = baseline === undefined ? undefined : String(baseline);
-      res
-        .type("html")
-        .send(
-          reportHtml(
-            await projectReport(
-              projects.desk(req.params.project),
-              id,
-              req.query.securitySnapshot === undefined
-                ? undefined
-                : String(req.query.securitySnapshot),
-              req.query.accessibilitySnapshot === undefined
-                ? undefined
-                : String(req.query.accessibilitySnapshot),
-            ),
-          ),
-        );
+      const param = (name: string) =>
+        req.query[name] === undefined ? undefined : String(req.query[name]);
+
+      const html = await report({
+        repo: projects.repo(req.params.project),
+        preview: req.query.preview === "saved",
+        snapshots: [
+          param("snapshot"),
+          param("securitySnapshot"),
+          param("accessibilitySnapshot"),
+        ],
+      });
+
+      if (html) res.type("html").send(html);
+      else res.sendStatus(204);
     } catch (error) {
       res.status(400).type("text").send(String(error));
     }

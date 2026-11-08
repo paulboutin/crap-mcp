@@ -206,6 +206,38 @@ test("one HTTP service isolates same-name checkouts across clients, dashboard se
   assert.notEqual(fresh, old);
 });
 
+test("dashboard shows the saved scan during refresh and invalidates the full report on a source edit", async (t) => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "report-loading-")));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const root = join(dir, "app");
+  mkdirSync(root);
+  git(root, "init");
+  const projects = new Projects(dir);
+  const { id } = projects.register(root);
+  const server = machineApp(projects).listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(() => server.close());
+  const { port } = z.object({ port: z.number() }).parse(server.address());
+  const url = "http://127.0.0.1:" + port + "/report/" + id;
+  const preview = url + "?preview=saved";
+  assert.equal((await fetch(preview)).status, 204);
+  writeFileSync(join(root, "code.ts"), "function savedFunction() {}");
+  const first = await (await fetch(url)).text();
+  assert.equal(await (await fetch(url)).text(), first);
+  writeFileSync(join(root, "code.ts"), "function currentFunction() {}");
+  const cached = await (await fetch(preview)).text();
+  assert.match(cached, /"symbol":"savedFunction"/);
+  assert.doesNotMatch(cached, /"symbol":"currentFunction"/);
+  const [left, right] = await Promise.all([fetch(url), fetch(url)]);
+  const current = await left.text();
+  assert.equal(await right.text(), current);
+  assert.match(current, /"symbol":"currentFunction"/);
+  writeFileSync(join(root, "page.html"), '<html><img src="a"></html>');
+  const changed = await (await fetch(url)).text();
+  assert.match(changed, /"file":"page.html"/);
+  assert.equal((await fetch(url + "?snapshot=invalid")).status, 400);
+});
+
 test("machine security settings persist and the dashboard compares the same saved findings as MCP", async (t) => {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "sec-machine-")));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
