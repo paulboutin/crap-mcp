@@ -118,7 +118,7 @@ test("offline dashboard distinguishes risk from unscored, pages and filters, and
     assert.equal(doc.querySelector("tbody summary")?.textContent, symbol);
   }
 
-  const search = doc.querySelector("input")!;
+  const search = doc.querySelector<HTMLInputElement>("#search")!;
   assert.equal(doc.querySelector("tbody tr td:nth-child(4)")?.textContent, "—");
   search.value = "absent";
   search.dispatchEvent(new window.Event("input"));

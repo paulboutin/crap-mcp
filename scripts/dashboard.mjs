@@ -1,3 +1,5 @@
+import { capturePatterns } from "../dist/pattern-scan.js";
+import { linkPatterns } from "../dist/pattern-evidence.js";
 import { dashboardAccessibility } from "../dist/accessibility.js";
 import { dashboardSecurity } from "../dist/security.js";
 import { projectEvidence } from "../dist/project-learning.js";
@@ -126,6 +128,10 @@ try {
       repo,
       process.env.ACCESSIBILITY_SNAPSHOT,
       process.env.CRAP_BASE ?? report.snapshot.commit,
+    ),
+    patterns: linkPatterns(
+      capturePatterns(repo, report.snapshot.input).data,
+      report.functions,
     ),
     security,
     repository: basename(root),

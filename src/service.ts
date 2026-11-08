@@ -1,3 +1,5 @@
+import { backgroundPatterns, savedPatterns } from "./pattern-scan.ts";
+import { linkPatterns } from "./pattern-evidence.ts";
 import { accessibilityTools } from "./accessibility-tools.ts";
 import { securityTools } from "./security-tools.ts";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -201,6 +203,52 @@ export function analysisServer(select: (id?: string) => Desk, shared: boolean) {
   accessibilityTools(server, select, scope);
   securityTools(server, select, scope);
 
+  server.registerTool(
+    "scan_code_patterns",
+    {
+      description:
+        "Run advisory TypeScript promise and SwiftLint checks plus the project's Oxlint rules. Returns source lines and enclosing functions even without coverage. Page using the returned pattern snapshot.",
+      inputSchema: {
+        ...scope,
+        ...page,
+        snapshot: z
+          .string()
+          .regex(/^[a-f0-9]{64}$/)
+          .optional(),
+      },
+    },
+    async (q) => {
+      const desk = select(q.project);
+      const current = q.snapshot ? undefined : await desk.current();
+
+      const snapshot =
+        q.snapshot ??
+        (await backgroundPatterns(desk.repo, current!.input, current!.id));
+
+      const data = savedPatterns(desk.repo, snapshot);
+
+      if (!data) throw Error("Unknown language-rule snapshot");
+
+      const code =
+        current ??
+        (data.codeSnapshot ? saved(desk.repo, data.codeSnapshot) : undefined);
+
+      const batch = slice(data.findings, q.offset, q.limit);
+
+      const linked = linkPatterns(
+        { ...data, findings: batch.items },
+        data.input === code?.input ? code.rows : [],
+      )!;
+
+      return reply({
+        snapshot,
+        notes: data.notes,
+        spacing: data.spacing,
+        ...batch,
+        items: linked.findings,
+      });
+    },
+  );
   server.registerTool(
     "analyze_function_health",
     {

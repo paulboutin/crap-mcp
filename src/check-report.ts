@@ -1,3 +1,5 @@
+import { linkPatterns } from "./pattern-evidence.ts";
+import { savedPatterns } from "./pattern-scan.ts";
 import { basename } from "node:path";
 import { accessibilityBaseline, accessibilityReport } from "./accessibility.ts";
 import { recentRuns } from "./check-history.ts";
@@ -33,7 +35,12 @@ export function checkReport(repo: Repo, at: string) {
     }));
   });
 
+  const patterns = section(run.patternSnapshot, (id) =>
+    savedPatterns(repo, id),
+  );
+
   return {
+    patterns: linkPatterns(patterns.data, code.data ?? []),
     check: run.at,
     repository: basename(repo.root),
     outcome: run.outcome,
