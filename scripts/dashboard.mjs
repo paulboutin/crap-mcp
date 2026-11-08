@@ -2,7 +2,7 @@ import { dashboardAccessibility } from "../dist/accessibility.js";
 import { dashboardSecurity } from "../dist/security.js";
 import { projectEvidence } from "../dist/project-learning.js";
 import { repository } from "../dist/files.js";
-import { reportHtml } from "../dist/report-html.js";
+import { reportHtml, saveRecordedReport } from "../dist/report-html.js";
 import assert from "node:assert/strict";
 import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
@@ -121,7 +121,7 @@ try {
     process.env.CRAP_BASE ?? report.snapshot.commit,
   );
 
-  const html = reportHtml({
+  const result = {
     accessibility: dashboardAccessibility(
       repo,
       process.env.ACCESSIBILITY_SNAPSHOT,
@@ -132,12 +132,15 @@ try {
     evidence: projectEvidence(repo),
     ...report,
     review,
-  });
+  };
+
+  const html = reportHtml(result);
 
   mkdirSync(dirname(destination), { recursive: true });
   const temporary = destination + "." + randomUUID();
   writeFileSync(temporary, html, { mode: 0o600 });
   renameSync(temporary, destination);
+  saveRecordedReport(repo.local, result);
   console.log("Dashboard: " + destination);
 } finally {
   await client.close();

@@ -34,11 +34,40 @@ REPORT_LICENSE
         </div>
         <div id="scan-status" class="pill"></div>
       </div>
+      <div class="cards" aria-label="Repository metrics">
+        <article>
+          <span>Functions assessed</span><strong id="assessed"></strong
+          ><small id="filecount"></small>
+        </article>
+        <article>
+          <span>Risk hotspots</span><strong id="hot"></strong
+          ><small>Measured CRAP above 30 · <span id="critical-count"></span></small>
+        </article>
+        <article>
+          <span>Unscored functions</span><strong id="unscored"></strong
+          ><small>No comparable score</small>
+        </article>
+        <article>
+          <span>Changed functions</span><strong id="changed"></strong
+          ><small id="comparison"></small>
+        </article>
+      </div>
+      <section class="strip">
+        <div><b>Score coverage</b><span id="fraction"></span></div>
+        <progress
+          id="meter"
+          aria-label="Functions with measured scores"
+        ></progress>
+        <p id="raw-scores"></p>
+        <p id="structure-count"></p>
+        <p id="gaps"></p>
+        <ul id="audit-notes" hidden></ul>
+        <a href="#function-panel">Explore functions by CRAP score</a>
+      </section>
       <section class="panel session" aria-label="Session health">
         <small class="eyebrow">SESSION GRADE · HIGHER IS BETTER</small>
         <h2 id="session-score"></h2>
         <p id="score-scope"></p>
-        <p id="raw-scores"></p>
         <details>
           <summary>How the session score works</summary>
           <p>
@@ -76,32 +105,6 @@ REPORT_LICENSE
           <p>Percentage of evaluated source checks that passed, rounded down. Dynamic values need review. A skipped file or zero evaluated checks leaves the score unrated. Verify keyboard use, contrast, focus order, alternative text quality and screen reader behavior in the running interface.</p>
           <ul id="access-rules"></ul>
         </details>
-      </section>
-      <div class="cards" aria-label="Repository metrics">
-        <article>
-          <span>Functions assessed</span><strong id="assessed"></strong
-          ><small id="filecount"></small>
-        </article>
-        <article>
-          <span>Risk hotspots</span><strong id="hot"></strong
-          ><small>Measured CRAP above 30</small>
-        </article>
-        <article>
-          <span>Unscored functions</span><strong id="unscored"></strong
-          ><small>No comparable score</small>
-        </article>
-        <article>
-          <span>Changed functions</span><strong id="changed"></strong
-          ><small id="comparison"></small>
-        </article>
-      </div>
-      <section class="strip">
-        <div><b>Score coverage</b><span id="fraction"></span></div>
-        <progress
-          id="meter"
-          aria-label="Functions with measured scores"
-        ></progress>
-        <p id="gaps"></p>
       </section>
       <section class="panel" id="check-targets" hidden>
         <h2>Project thresholds</h2><p id="target-count"></p>

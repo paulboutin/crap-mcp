@@ -3,12 +3,18 @@ import { shareProject } from "./project-learning.ts";
 import { z } from "zod";
 import { recentRuns } from "./check-history.ts";
 import { fileURLToPath } from "node:url";
-import { readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+import { constants, readFileSync } from "node:fs";
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { Projects, sharedServer } from "./projects.ts";
 import { checkReport } from "./check-report.ts";
-import { reportHtml } from "./report-html.ts";
+import {
+  archivedReportData,
+  recordedSource,
+  reportDocument,
+  reportHtml,
+} from "./report-html.ts";
 import { machineReports } from "./machine-reports.ts";
 
 export function machineApp(projects: Projects) {
@@ -110,6 +116,38 @@ export function machineApp(projects: Projects) {
         );
     } catch (error) {
       res.status(404).type("text").send(String(error));
+    }
+  });
+  app.get("/report/:project/recorded", async (req, res) => {
+    try {
+      const file = recordedSource(projects.repo(req.params.project));
+
+      if (!file) {
+        res.sendStatus(204);
+
+        return;
+      }
+
+      if (req.method === "HEAD") {
+        res.type("html").end();
+
+        return;
+      }
+
+      const data = await readFile(file, {
+        encoding: "utf8",
+        flag: constants.O_RDONLY | constants.O_NOFOLLOW,
+      });
+
+      res
+        .type("html")
+        .send(
+          reportDocument(
+            file.endsWith(".html") ? archivedReportData(data) : data,
+          ),
+        );
+    } catch (error) {
+      res.status(400).type("text").send(String(error));
     }
   });
   app.get("/report/:project", async (req, res) => {
