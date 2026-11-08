@@ -24,7 +24,10 @@ function grade(summary: Summary) {
   return [value, qualifier ? "Provisional session health" : "Session health"];
 }
 
-function trials(run: CheckRun | undefined, kind: "qa" | "benchmark") {
+export function trialStatus(
+  run: CheckRun | undefined,
+  kind: "qa" | "benchmark",
+) {
   const items = run?.trials?.filter((t) => t.kind === kind) ?? [];
 
   if (!items.length) return "Unmeasured";
@@ -59,8 +62,8 @@ export async function scorecard(
     <text x="28" y="104" fill="#fff" font-weight="bold" font-size="49">${escape(value)}</text>
     <text x="652" y="102" fill="#d2eae0" text-anchor="end" font-size="17">${escape(label)}</text>
     ${metric(28, "Changed functions scored", summary.measured + "/" + summary.total)}
-    ${metric(276, "QA replays", trials(run, "qa"))}
-    ${metric(478, "Benchmarks", trials(run, "benchmark"))}
+    ${metric(276, "QA replays", trialStatus(run, "qa"))}
+    ${metric(478, "Benchmarks", trialStatus(run, "benchmark"))}
     </g></svg>`;
 
   return saveCard(directory, baseline + "-" + current, svg);

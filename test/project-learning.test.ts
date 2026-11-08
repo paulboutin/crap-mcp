@@ -3,7 +3,13 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { z } from "zod";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  rmSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { git, repository } from "../src/files.ts";
@@ -85,6 +91,22 @@ test("replay failures and benchmark regressions survive sharing and a fresh clon
   const client = new Client({ name: "qa-review", version: "1" });
   await server.connect(serverSide);
   await client.connect(clientSide);
+
+  const markdown = await client.callTool({
+    name: "review_changes",
+    arguments: { snapshot: before.metrics!.snapshot, format: "markdown" },
+  });
+
+  assert.deepEqual(
+    markdown.content.map((block) => block.type),
+    ["text"],
+  );
+  const body = z.object({ text: z.string() }).parse(markdown.content[0]).text;
+  assert.match(body, /\*\*Session health · /);
+  assert.match(body, /0\/1 passed/);
+  assert.match(body, /Replay · qa: passed → failed/);
+  assert.match(body, /\[Detailed report\]\(/);
+  assert.equal(existsSync(join(repo.local, "scorecards")), false);
 
   const chat = await client.callTool({
     name: "review_changes",

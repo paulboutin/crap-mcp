@@ -450,6 +450,24 @@ test("security MCP scans syntax, compares a dirty baseline and renders a separat
 
   assert.equal(pinned.comparison.introduced.total, 1);
 
+  const md = await c.callTool({
+    name: review,
+    arguments: {
+      snapshot: first.snapshot,
+      current: diff.snapshot,
+      format: "markdown",
+    },
+  });
+
+  assert.deepEqual(
+    md.content.map((block) => block.type),
+    ["text"],
+  );
+  assert.match(
+    z.object({ text: z.string() }).parse(md.content[0]).text,
+    /Application security · 65\/100/,
+  );
+
   const card = await c.callTool({
     name: review,
     arguments: {
@@ -528,6 +546,19 @@ test("accessibility MCP preserves a dirty baseline, reports known results separa
   const diff = await call(c, review, { snapshot: first.snapshot });
   assert.equal(diff.score, 100);
   assert.equal(diff.comparison.resolved.total, 2);
+
+  const md = await c.callTool({
+    name: scan,
+    arguments: { snapshot: first.snapshot, format: "markdown" },
+  });
+
+  assert.deepEqual(
+    md.content.map((block) => block.type),
+    ["text"],
+  );
+  const body = z.object({ text: z.string() }).parse(md.content[0]).text;
+  assert.match(body, /Accessibility · 50\/100/);
+  assert.match(body, /Colorblind score/);
   const old = await call(c, review, { base: "HEAD", current: first.snapshot });
   assert.equal(old.comparison.introduced.total, 2);
 
@@ -536,7 +567,7 @@ test("accessibility MCP preserves a dirty baseline, reports known results separa
     arguments: {
       snapshot: first.snapshot,
       current: diff.snapshot,
-      format: "chat",
+      format: "markdown",
       scorecard: true,
     },
   });

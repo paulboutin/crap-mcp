@@ -11,6 +11,6 @@ CLI gate; use review_changes with the saved snapshot for existing uncommitted ch
 Keep missing evidence explicit. Do not weaken the risk thresholds to make CI pass.
 
 End each coding session by calling review_changes with the starting snapshot and
-format="chat". Include its session score or unrated reason, evidence counts and
+format="markdown". Include its session score or unrated reason, evidence counts and
 a representative before/after CRAP score in the user-visible reply. If MCP is
-unavailable in the host, run npm run summary -- --snapshot <id> instead.
+unavailable in the host, run npm run summary -- --markdown --snapshot <id> instead.

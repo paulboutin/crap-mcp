@@ -1,3 +1,8 @@
+import {
+  sessionMarkdown,
+  artifactLink,
+  type CardFormat,
+} from "./markdown-card.ts";
 import { backgroundPatterns, savedPatterns } from "./pattern-scan.ts";
 import { linkPatterns } from "./pattern-evidence.ts";
 import { accessibilityTools } from "./accessibility-tools.ts";
@@ -122,6 +127,7 @@ async function chatReview(
   now: Snapshot,
   changes: ReturnType<typeof review>,
   showCard: boolean,
+  format: CardFormat,
 ) {
   const report = codeReport(repo.root, now);
   report.review = comparisonReport(
@@ -134,26 +140,46 @@ async function chatReview(
   const runs = recentRuns(repo);
   const latest = matchingCheck(repo, now, runs);
 
-  const lines = [
-    summary.chat,
+  const suite =
     "Suite: " +
-      now.suite +
-      " · run " +
-      (now.run ?? "none") +
-      " · baseline " +
-      base.id.slice(0, 12) +
-      " → " +
-      now.id.slice(0, 12),
-  ];
+    now.suite +
+    " · run " +
+    (now.run ?? "none") +
+    " · baseline " +
+    base.id.slice(0, 12) +
+    " → " +
+    now.id.slice(0, 12);
 
-  if (latest?.trials?.length)
-    lines.push(...compareChecks(latest, matchingCheck(repo, base, runs)));
-  lines.push("Detailed report: " + path);
-  const result = { type: "text" as const, text: lines.join("\n") };
+  const checks = latest
+    ? compareChecks(latest, matchingCheck(repo, base, runs))
+    : [];
+
+  const text =
+    format === "markdown"
+      ? sessionMarkdown(
+          summary,
+          changes.unassessed.length,
+          latest,
+          checks,
+          suite,
+        ) +
+        "\n\n" +
+        artifactLink("Detailed report", path)
+      : [
+          summary.chat,
+          suite,
+          ...(latest?.trials?.length ? checks : []),
+          "Detailed report: " + path,
+        ].join("\n");
+
+  const result = { type: "text" as const, text };
 
   if (!showCard) return { content: [result] };
   const card = await scorecard(repo.local, base.id, now.id, summary, latest);
-  result.text += "\nScorecard: " + card.path;
+  result.text +=
+    format === "markdown"
+      ? "\n\n" + artifactLink("PNG scorecard", card.path)
+      : "\nScorecard: " + card.path;
 
   return { content: [result, card.image] };
 }
@@ -173,9 +199,9 @@ const changes = z.object({
     .boolean()
     .default(false)
     .describe(
-      "With chat format, include a PNG image and its absolute file path.",
+      "With chat or markdown format, include a PNG image and its absolute file path.",
     ),
-  format: z.enum(["data", "chat"]).default("data"),
+  format: z.enum(["data", "chat", "markdown"]).default("data"),
   ...page,
   base: z.string().min(1).optional(),
   snapshot: z
@@ -347,7 +373,7 @@ export function analysisServer(select: (id?: string) => Desk, shared: boolean) {
     "review_changes",
     {
       description:
-        "Review a session against its starting snapshot or revision. Use format=chat at completion and show the returned session health and raw CRAP changes in your reply.",
+        "Review a session against its starting snapshot or revision. Use format=markdown for a text-only scorecard at completion and show the returned session health and raw CRAP changes in your reply.",
       inputSchema: changes.extend(scope),
     },
     async (q) => {
@@ -359,8 +385,15 @@ export function analysisServer(select: (id?: string) => Desk, shared: boolean) {
       const result = review(base, now, q.findingId);
       const fullReview = q.findingId ? review(base, now) : result;
 
-      if (q.format === "chat")
-        return chatReview(desk.repo, base, now, fullReview, q.scorecard);
+      if (q.format !== "data")
+        return chatReview(
+          desk.repo,
+          base,
+          now,
+          fullReview,
+          q.scorecard,
+          q.format,
+        );
 
       const affected = slice(result.affected, q.offset, q.limit);
 

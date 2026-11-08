@@ -1,3 +1,8 @@
+import {
+  securityMarkdown,
+  artifactLink,
+  type CardFormat,
+} from "./markdown-card.ts";
 import { sourceTools } from "./source-tools.ts";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -31,6 +36,7 @@ async function securityChat(
   r: SecurityReport,
   directory: string,
   card: boolean,
+  format: CardFormat,
 ) {
   const text = {
     type: "text" as const,
@@ -52,7 +58,10 @@ async function securityChat(
     security: r,
   });
 
-  text.text += "\nDetailed report: " + report;
+  text.text =
+    format === "markdown"
+      ? securityMarkdown(r) + "\n\n" + artifactLink("Detailed report", report)
+      : text.text + "\nDetailed report: " + report;
 
   if (!card) return { content: [text] };
 
@@ -65,7 +74,10 @@ async function securityChat(
 
   const saved = await saveCard(directory, key, svg);
 
-  text.text += "\nScorecard: " + saved.path;
+  text.text +=
+    format === "markdown"
+      ? "\n\n" + artifactLink("PNG scorecard", saved.path)
+      : "\nScorecard: " + saved.path;
 
   return { content: [text, saved.image] };
 }
@@ -82,8 +94,8 @@ export function securityTools(
       load: securityBaseline,
       data: (offset, limit, now, before) =>
         paged(securityReport(now, before), offset, limit),
-      chat: (dir, card, now, before) =>
-        securityChat(securityReport(now, before), dir, card),
+      chat: (dir, card, now, format, before) =>
+        securityChat(securityReport(now, before), dir, card, format),
     },
     server,
     select,
