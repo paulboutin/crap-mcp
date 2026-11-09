@@ -2,7 +2,7 @@ import { Parser, Language, type Node } from "web-tree-sitter";
 import {
   acquireGrammar,
   adapter,
-  languages,
+  languageCatalog,
   languageFor,
   type Adapter,
 } from "./languages.ts";
@@ -18,22 +18,24 @@ async function loadParser(pack: Adapter) {
   const grammar = await Language.load(await acquireGrammar(pack));
   const parser = new Parser();
   parser.setLanguage(grammar);
-  parsers.set(pack.id, parser);
+  parsers.set(pack.version, parser);
 }
 
 export async function prepareLanguage(id: string) {
-  if (parsers.has(id)) return;
-  let pending = loading.get(id);
+  const pack = adapter(id);
+
+  if (parsers.has(pack.version)) return;
+  let pending = loading.get(pack.version);
 
   if (!pending) {
-    pending = loadParser(adapter(id)).finally(() => loading.delete(id));
-    loading.set(id, pending);
+    pending = loadParser(pack).finally(() => loading.delete(pack.version));
+    loading.set(pack.version, pending);
   }
 
   await pending;
 }
 
-for (const pack of languages) {
+for (const pack of languageCatalog()) {
   if (pack.core) await prepareLanguage(pack.id);
 }
 
@@ -217,7 +219,7 @@ export function withSyntax<T>(
   source: string,
   inspect: (root: Node) => T,
 ) {
-  const tree = parsers.get(id)!.parse(source);
+  const tree = parsers.get(adapter(id).version)!.parse(source);
 
   if (!tree) throw Error("Parser did not produce a tree");
 

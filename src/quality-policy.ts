@@ -6,7 +6,12 @@ import {
 } from "./accessibility-rules.ts";
 import { ruleId, securityCatalog, securityIds } from "./security-rules.ts";
 import { prepareLanguage } from "./syntax.ts";
-import { adapter, languages } from "./languages.ts";
+import {
+  adapter,
+  installedAdapter,
+  languageCatalog,
+  refreshLanguageCatalog,
+} from "./languages.ts";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
@@ -81,10 +86,24 @@ export const targets = z
       .optional(),
     omitDirectories: directories.default([]),
     packs: z
-      .array(z.enum(languages.flatMap((l) => (l.core ? [] : [l.id]))))
+      .array(
+        z
+          .string()
+          .refine(
+            (id) => installedAdapter(id)?.core === false,
+            "Unknown optional pack",
+          ),
+      )
       .default([]),
     linters: z
-      .array(z.enum(languages.flatMap((l) => (l.linter ? [l.id] : []))))
+      .array(
+        z
+          .string()
+          .refine(
+            (id) => Boolean(installedAdapter(id)?.linter),
+            "Unknown native linter",
+          ),
+      )
       .default([]),
   })
   .strict();
@@ -133,7 +152,11 @@ const captured = z.object({
 });
 
 const stored = z.object({
-  settings: targets,
+  // Keep saved selections readable when a previously enabled pack was uninstalled.
+  settings: targets.extend({
+    packs: z.array(z.string()).default([]),
+    linters: z.array(z.string()).default([]),
+  }),
   changes: z.array(change),
   lessons: z.array(lesson).default([]),
   capture: captured.nullable().default(null),
@@ -188,14 +211,28 @@ export function qualityPolicy(repo: Repo) {
     securityCatalog,
     accessibilityCatalog,
     analysisExclusions: repo.config.exclude,
-    languages: languages.map(({ id, core, extensions, bytes, linter }) => ({
-      id,
-      core,
-      extensions,
-      bytes,
-      linter: linter?.name,
-    })),
+    languages: languageCatalog().map(
+      ({ id, core, extensions, bytes, linter }) => ({
+        id,
+        core,
+        extensions,
+        bytes,
+        linter: linter?.name,
+      }),
+    ),
   };
+}
+
+export function projectSettings(repo: Repo) {
+  let catalogError: string | undefined;
+
+  try {
+    refreshLanguageCatalog();
+  } catch (error) {
+    catalogError = "Could not refresh language packs: " + String(error);
+  }
+
+  return { ...qualityPolicy(repo), catalogError };
 }
 
 export function updatePolicy(repo: Repo, input: z.infer<typeof edit>) {

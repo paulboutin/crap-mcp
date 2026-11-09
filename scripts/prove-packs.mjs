@@ -31,16 +31,24 @@ const base = JSON.parse(
 
 const { fileURLToPath } = await import("node:url");
 
-writeFileSync(
-  join(custom, "custom.json"),
-  JSON.stringify({
-    ...base,
-    id: "local-test",
-    extensions: [".localtest"],
-    core: false,
-    wasm: fileURLToPath(new URL("../languages/" + base.wasm, import.meta.url)),
-  }),
-);
+function installCustomPack() {
+  writeFileSync(
+    join(custom, "custom.json"),
+    JSON.stringify({
+      ...base,
+      id: "local-test",
+      extensions: [".localtest"],
+      core: false,
+      wasm: fileURLToPath(
+        new URL("../languages/" + base.wasm, import.meta.url),
+      ),
+      linter: {
+        name: "Fixture analyzer",
+        command: [process.execPath, "--version"],
+      },
+    }),
+  );
+}
 
 const { machineApp } = await import("../dist/machine-app.js");
 const { Projects } = await import("../dist/projects.js");
@@ -87,6 +95,34 @@ try {
     writeFileSync(join(root, file), source);
     const { id: project } = await call("register_project", { path: root });
     const endpoint = url + "/projects/" + project + "/settings";
+
+    if (language === "local-test") {
+      const initial = await (await fetch(endpoint)).json();
+      assert.ok(!initial.languages.some((entry) => entry.id === language));
+      installCustomPack();
+      const refreshed = await (await fetch(endpoint)).json();
+      assert.equal(
+        refreshed.languages.find((entry) => entry.id === language)?.linter,
+        "Fixture analyzer",
+      );
+      assert.deepEqual(refreshed.settings.linters, []);
+
+      const saved = await fetch(endpoint, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          revision: refreshed.revision,
+          settings: { ...refreshed.settings, linters: [language] },
+        }),
+      });
+
+      assert.ok(saved.ok, await saved.text());
+      assert.deepEqual(
+        (await call("get_project_settings", { project })).settings.linters,
+        [language],
+      );
+    }
+
     const before = await call("get_project_settings", { project });
     assert.equal((await call("get_repository_report", { project })).total, 0);
 

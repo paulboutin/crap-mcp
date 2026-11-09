@@ -7,7 +7,7 @@ import {
   edit,
   languageChange,
   setLanguage,
-  qualityPolicy,
+  projectSettings,
 } from "./quality-policy.ts";
 import {
   learningInput,
@@ -121,7 +121,7 @@ export function sharedServer(projects: Projects) {
           {
             type: "text",
             text: JSON.stringify({
-              ...qualityPolicy(repo),
+              ...projectSettings(repo),
               runs: recentRuns(repo),
             }),
           },
