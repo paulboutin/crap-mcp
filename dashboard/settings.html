@@ -60,6 +60,7 @@
         border: 0;
         padding: 0;
       }
+      pre { white-space: pre-wrap; overflow-wrap: anywhere; }
       #rules {
         columns: 2;
         overflow-wrap: anywhere;
@@ -141,6 +142,7 @@
             Enable an optional parser to download it once for this machine. Each
             checkout chooses its own packs.
           </p>
+          <p id="catalog-error" role="status" hidden></p>
           <fieldset id="packs" aria-label="Language packs"></fieldset>
           <details>
             <summary>Install a custom language pack</summary>
@@ -159,19 +161,29 @@
               Place the trusted JSON manifest in
               <code>~/.local/share/crap-mcp/languages/</code>. For a local
               grammar, also copy the WASM file to the path named in the
-              manifest. On macOS restart the service with
-              <code
-                >launchctl kickstart -k gui/$(id
-                -u)/com.crap-score.machine</code
-              >, then reload this page, select the pack, and save.
+              manifest. Reload this page, select the pack, and save.
             </p>
           </details>
           <h3>Native linters</h3>
           <p>
-            Project checks run enabled tools from your installed toolchain.
-            Install the named tool first.
+            Reload Settings after installing a pack to see its linters here.
+            Select the tools to run for this project and save. Each selected
+            tool needs to be installed in your toolchain. Its project configuration selects individual rules.
           </p>
           <fieldset id="linters" aria-label="Native linters"></fieldset>
+          <details>
+            <summary>Run another static analyzer</summary>
+            <p>
+              <a href="https://semgrep.dev/explore" target="_blank" rel="noopener noreferrer">Semgrep rules</a>
+              can find patterns such as blocking calls inside async functions.
+              <a href="https://github.com/peripheryapp/periphery" target="_blank" rel="noopener noreferrer">Periphery</a>
+              finds unused declarations in Swift projects.
+            </p>
+            <p>To run a configured analyzer, add its command to <code>checks</code> in the project’s <code>.crap.json</code>.
+              For example, with Semgrep installed and a local rule file:</p>
+            <pre><code>"checks": [["semgrep", "scan", "--config", "rules/quality.yml", "--metrics=off", "--error", "."]]</code></pre>
+            <p>Recent checks shows the command’s exit status. Inspect the analyzer output for individual findings.</p>
+          </details>
         </section>
         <section>
           <h2>Lint rules</h2>
@@ -314,6 +326,26 @@
         if (!list.length)
           by("runs").textContent = "No project checks recorded yet.";
       }
+      const libraries = new Map([
+        ["Ruff", ["https://docs.astral.sh/ruff/rules/", "B006 flags mutable defaults shared across Python calls."]],
+        ["Staticcheck", ["https://staticcheck.dev/docs/checks/", "SA4006 finds a value overwritten before it is read."]],
+        ["Clippy", ["https://rust-lang.github.io/rust-clippy/stable/index.html", "await_holding_lock finds a lock guard held across an await."]],
+        ["SwiftLint", ["https://realm.github.io/SwiftLint/rule-directory.html", "weak_delegate flags a delegate reference that could cause a retain cycle."]],
+      ]);
+
+      function showRuleLibrary(parent, tool) {
+        const library = libraries.get(tool);
+        if (!library) return;
+        const note = document.createElement("small");
+        const link = document.createElement("a");
+        link.href = library[0];
+        link.textContent = tool + " rule library";
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        note.append(link, " · " + library[1]);
+        parent.append(note);
+      }
+
       async function load() {
         const response = await fetch(endpoint);
         if (!response.ok) throw Error("Could not load settings.");
@@ -360,6 +392,8 @@
           (data.analysisExclusions.join(", ") || "none");
         by("suite").textContent =
           "Designated suite: " + data.suite + " · Report: " + data.report;
+        by("catalog-error").hidden = !data.catalogError;
+        by("catalog-error").textContent = data.catalogError ?? "";
         for (const key of ["packs", "linters"]) {
           by(key).replaceChildren();
           for (const lang of data.languages) {
@@ -373,12 +407,23 @@
               input.disabled || data.settings[key].includes(lang.id);
             const title =
               key === "linters"
-                ? lang.linter
+                ? lang.linter + " · " + lang.id
                 : lang.id +
                   (lang.core
                     ? " · included"
                     : " · " + Math.ceil(lang.bytes / 1024) + " KiB");
             label.append(input, " " + title);
+            by(key).append(label);
+            if (key === "linters") showRuleLibrary(by(key), lang.linter);
+          }
+          for (const id of data.settings[key]) {
+            if (Array.from(by(key).querySelectorAll("input")).some(input => input.value === id)) continue;
+            const label = document.createElement("label");
+            const input = document.createElement("input");
+            input.type = "checkbox";
+            input.value = id;
+            input.checked = true;
+            label.append(input, " " + id + " · unavailable (uncheck to remove)");
             by(key).append(label);
           }
         }

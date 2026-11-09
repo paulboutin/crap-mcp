@@ -62,28 +62,52 @@ export function loadLanguages(directory: string) {
     });
 }
 
-export const languages = [
-  ...loadLanguages(fileURLToPath(new URL("../languages", import.meta.url))),
-  ...loadLanguages(process.env.CRAP_LANGUAGE_DIR ?? join(dataDir, "languages")),
-];
+export type Adapter = ReturnType<typeof loadLanguages>[number];
 
-export type Adapter = (typeof languages)[number];
+const bundled = loadLanguages(
+  fileURLToPath(new URL("../languages", import.meta.url)),
+);
 
-const extensions = new Map<string, Adapter>();
-const ids = new Map<string, Adapter>();
+function readCatalog() {
+  const custom = loadLanguages(
+    process.env.CRAP_LANGUAGE_DIR ?? join(dataDir, "languages"),
+  );
 
-for (const language of languages) {
-  if (ids.has(language.id)) throw Error("Duplicate language ID " + language.id);
-  ids.set(language.id, language);
+  const languages = [...bundled, ...custom];
+  const extensions = new Map<string, Adapter>();
+  const ids = new Map<string, Adapter>();
 
-  for (const ext of language.extensions) {
-    if (extensions.has(ext)) throw Error("Conflicting adapters for " + ext);
-    extensions.set(ext, language);
+  for (const language of languages) {
+    if (ids.has(language.id))
+      throw Error("Duplicate language ID " + language.id);
+    ids.set(language.id, language);
+
+    for (const ext of language.extensions) {
+      if (extensions.has(ext)) throw Error("Conflicting adapters for " + ext);
+      extensions.set(ext, language);
+    }
   }
+
+  return { languages, extensions, ids };
+}
+
+let catalog = readCatalog();
+
+export function languageCatalog() {
+  return catalog.languages;
+}
+
+export function refreshLanguageCatalog() {
+  // Replace the indexes together only after every manifest validates.
+  catalog = readCatalog();
+}
+
+export function installedAdapter(id: string) {
+  return catalog.ids.get(id);
 }
 
 export function adapter(id: string) {
-  const result = ids.get(id);
+  const result = installedAdapter(id);
 
   if (!result) throw Error("Unknown language pack: " + id);
 
@@ -93,7 +117,7 @@ export function adapter(id: string) {
 export function languageFor(file: string) {
   if (/\.d\.[cm]?ts$/.test(file)) return undefined;
 
-  return extensions.get(extname(file));
+  return catalog.extensions.get(extname(file));
 }
 
 export function verifyGrammar(pack: Adapter, bytes: Uint8Array) {

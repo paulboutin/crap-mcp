@@ -1,4 +1,4 @@
-import { qualityPolicy, applyPolicy, edit } from "./quality-policy.ts";
+import { projectSettings, applyPolicy, edit } from "./quality-policy.ts";
 import { shareProject } from "./project-learning.ts";
 import { z } from "zod";
 import { recentRuns } from "./check-history.ts";
@@ -60,7 +60,7 @@ export function machineApp(projects: Projects) {
   app.get("/projects/:project/settings", (req, res) => {
     const repo = projects.repo(req.params.project);
     res.json({
-      ...qualityPolicy(repo),
+      ...projectSettings(repo),
       suite: repo.config.suite,
       report: repo.config.report ?? "coverage/lcov.info",
       runs: recentRuns(repo),

@@ -18,6 +18,7 @@ import {
   writeJson,
   type Repo,
 } from "./files.ts";
+import { languageCatalog, languageFor } from "./languages.ts";
 import { fingerprint, receipt, type Receipt } from "./coverage.ts";
 import { health, healthSchema } from "./findings.ts";
 import { parse, prepareLanguage, type Routine } from "./syntax.ts";
@@ -111,7 +112,7 @@ function inspect(
   cache: Map<string, Routine[]>,
   run?: Receipt,
 ) {
-  const key = file + "\0" + digest(source);
+  const key = languageFor(file)!.version + "\0" + file + "\0" + digest(source);
   const rows = cache.get(key) ?? parse(file, source);
 
   if (cache.size >= 5000) cache.clear();
@@ -177,7 +178,12 @@ export async function scan(
   cache: Map<string, Routine[]>,
 ) {
   checkConfig(repo);
-  await Promise.all(repo.packs.map(prepareLanguage));
+
+  const core = languageCatalog()
+    .filter((pack) => pack.core)
+    .map((pack) => pack.id);
+
+  await Promise.all([...core, ...repo.packs].map(prepareLanguage));
 
   const input = fingerprint(repo),
     run = receipt(repo),
