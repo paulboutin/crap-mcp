@@ -1,3 +1,4 @@
+import { operationalReport } from "./operational-store.ts";
 import { linkPatterns } from "./pattern-evidence.ts";
 import { latestPatterns } from "./pattern-scan.ts";
 import { dashboardAccessibility } from "./accessibility.ts";
@@ -193,6 +194,7 @@ export async function projectReport(
 
   const report: Report = {
     ...codeReport(desk.repo.root, current),
+    operational: operationalReport(desk.repo),
     accessibility: dashboardAccessibility(
       desk.repo,
       accessibilitySnapshot,

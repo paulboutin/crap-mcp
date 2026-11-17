@@ -1,3 +1,4 @@
+import { operationalPolicy } from "./operational-schema.ts";
 import { palettePairs } from "./color-contrast.ts";
 import {
   accessibilityCatalog,
@@ -55,6 +56,7 @@ const ruleList = z
 
 export const targets = z
   .object({
+    operational: operationalPolicy.nullable().optional(),
     maxCrap: z.number().positive().max(1000000),
     minCoverage: z.number().min(0).max(100),
     rules: ruleList,
@@ -235,6 +237,12 @@ export function projectSettings(repo: Repo) {
   return { ...qualityPolicy(repo), catalogError };
 }
 
+function operationalSelection(next: Targets, previous: Targets) {
+  return next.operational === undefined
+    ? previous.operational
+    : next.operational;
+}
+
 export function updatePolicy(repo: Repo, input: z.infer<typeof edit>) {
   const current = qualityPolicy(repo);
 
@@ -243,6 +251,7 @@ export function updatePolicy(repo: Repo, input: z.infer<typeof edit>) {
 
   const settings = {
     ...input.settings,
+    operational: operationalSelection(input.settings, current.settings),
     minColorblindScore:
       input.settings.minColorblindScore === undefined
         ? current.settings.minColorblindScore
@@ -297,6 +306,9 @@ export function updatePolicy(repo: Repo, input: z.infer<typeof edit>) {
 function enabled(settings: Targets) {
   return [
     ...settings.rules,
+    ...(settings.operational
+      ? ["operational/" + digest(JSON.stringify(settings.operational))]
+      : []),
     ...(settings.minColorblindScore == null
       ? []
       : ["colorblind/target:" + settings.minColorblindScore]),

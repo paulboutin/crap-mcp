@@ -119,6 +119,11 @@
           ><small id="suite"></small>
         </section>
         <section>
+          <h2>Operational health</h2>
+          <p>Define a workload policy before importing measurements. Weights and thresholds are project choices, not validated standards. Saving a policy never runs load or fault tests. The team manifest shares this policy; evidence stays local.</p>
+          <label for="operational">Version 1 policy (JSON; blank disables operational scoring)</label>
+          <textarea id="operational" rows="14" spellcheck="false" style="width: min(100%, 70em)"></textarea>
+          <p>Each axis has metric IDs, weights summing to 1, units, direction, target, failure threshold, mandatory status, statistic and minimum sample count. Copy the generalized starter from docs/operational-health.md and calibrate it for your workload.</p>
           <h2>Application security</h2>
           <p>Select source checks for the separate security score. These rules map to the OWASP Top 10:2025. Clearing all rules leaves security unrated.</p>
           <label>Minimum security score <input id="minSecurityScore" type="number" min="0" max="100" step="1" placeholder="Off" /></label>
@@ -361,6 +366,7 @@
         for (const key of ["maxCrap", "minCoverage"])
           by(key).value = data.settings[key];
         by("minSecurityScore").value = data.settings.minSecurityScore ?? "";
+        by("operational").value = data.settings.operational ? JSON.stringify(data.settings.operational, null, 2) : "";
         const security = by("securityRules");
         security.replaceChildren();
         for (const [id, rule] of Object.entries(data.securityCatalog)) {
@@ -489,6 +495,7 @@
           const settings = {
             minColorblindScore: by("minColorblindScore").value === "" ? null : by("minColorblindScore").valueAsNumber,
             minAccessibilityScore: by("minAccessibilityScore").value === "" ? null : by("minAccessibilityScore").valueAsNumber,
+            operational: by("operational").value.trim() ? JSON.parse(by("operational").value) : null,
             accessibilityPalette: by("accessibilityPalette").value.split("\n").filter(line=>line.trim()).map(line=>{
               const match=/^(#[a-f0-9]{3}(?:[a-f0-9]{3})?)\s+(#[a-f0-9]{3}(?:[a-f0-9]{3})?)\s+(.+)$/i.exec(line.trim());
               if (!match) throw Error("Each palette row needs two hex colors and a label.");
