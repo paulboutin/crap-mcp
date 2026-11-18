@@ -22,6 +22,7 @@ markdown_extensions:
 extra_css:
   - guide.css
 nav:
+  - Operational health: operational-health.md
   - Start with a skill: index.md
   - Install and connect: getting-started.md
   - Agent skills:

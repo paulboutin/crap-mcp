@@ -1,0 +1,167 @@
+{
+  "version": 1,
+  "id": "bcb18464e1f966d2d61850a9f47c256d377c0a25e71da27096fdbe30af07fd8f",
+  "importedAt": "2026-01-01T00:02:00.000Z",
+  "policy": {
+    "version": 1,
+    "profile": "example-service",
+    "sourceRules": [
+      "per-call-client",
+      "promise-fanout"
+    ],
+    "workload": "catalog-read-v1",
+    "maxAgeSeconds": 86400,
+    "minDurationSeconds": 60,
+    "confidence": 0.95,
+    "axes": {
+      "scalability": [
+        {
+          "id": "capacity",
+          "label": "Sustainable capacity ratio",
+          "weight": 1,
+          "unit": "ratio",
+          "direction": "higher",
+          "target": 1.5,
+          "failureThreshold": 0.5,
+          "mandatory": true,
+          "minSamples": 10,
+          "statistic": "scalar"
+        }
+      ],
+      "performance": [
+        {
+          "id": "latency",
+          "label": "All-attempt latency p95",
+          "weight": 1,
+          "unit": "ms",
+          "direction": "lower",
+          "target": 100,
+          "failureThreshold": 500,
+          "mandatory": true,
+          "minSamples": 100,
+          "statistic": "p95"
+        }
+      ],
+      "reliability": [
+        {
+          "id": "bad-events",
+          "label": "Bad-event rate upper bound",
+          "weight": 1,
+          "unit": "ratio",
+          "direction": "lower",
+          "target": 0.001,
+          "failureThreshold": 0.01,
+          "mandatory": true,
+          "minSamples": 1000,
+          "statistic": "bad-rate-upper"
+        }
+      ]
+    }
+  },
+  "evidence": {
+    "version": 1,
+    "repository": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sourceCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "imageHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "configHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "policyHash": "d64439448f7754301cf3f9983df332924bc2975f33f53334707194f021f0d486",
+    "workload": "catalog-read-v1",
+    "workloadHash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "datasetHash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "harnessVersion": "catalog-replay/1",
+    "environment": "disposable-fixture",
+    "deployment": "candidate-a",
+    "mode": "synthetic",
+    "resources": [
+      {
+        "name": "cpu",
+        "value": 2,
+        "unit": "vCPU"
+      }
+    ],
+    "model": null,
+    "corpusHash": null,
+    "startedAt": "2026-01-01T00:00:00.000Z",
+    "endedAt": "2026-01-01T00:01:00.000Z",
+    "durationSeconds": 60,
+    "status": "completed",
+    "telemetryComplete": true,
+    "coordinatedOmissionCorrected": true,
+    "attempts": {
+      "offered": 2000000,
+      "accepted": 2000000,
+      "completed": 2000000,
+      "errors": 0,
+      "cancelled": 0,
+      "incomplete": 0
+    },
+    "metrics": [
+      {
+        "id": "capacity",
+        "unit": "ratio",
+        "population": "active-windows",
+        "observation": {
+          "kind": "scalar",
+          "value": 1.5,
+          "samples": 60
+        }
+      },
+      {
+        "id": "latency",
+        "unit": "ms",
+        "population": "all-attempts",
+        "observation": {
+          "kind": "histogram",
+          "bins": [
+            {
+              "upper": 100,
+              "count": 1950000
+            },
+            {
+              "upper": 1000,
+              "count": 50000
+            }
+          ],
+          "samples": 2000000
+        }
+      },
+      {
+        "id": "bad-events",
+        "unit": "ratio",
+        "population": "all-attempts",
+        "observation": {
+          "kind": "bad-rate",
+          "bad": 0,
+          "samples": 2000000,
+          "independentTrials": true
+        }
+      }
+    ],
+    "gates": {
+      "slo": "passed",
+      "accepted-data": "passed",
+      "external-effects": "passed",
+      "privacy-reset": "passed"
+    },
+    "queues": [
+      {
+        "name": "oldest",
+        "value": 0,
+        "unit": "s"
+      }
+    ],
+    "costBasis": null,
+    "faults": [
+      {
+        "name": "restart",
+        "status": "passed",
+        "recoverySeconds": 2,
+        "lostAccepted": 0,
+        "duplicateEffects": 0,
+        "privacyBypass": false
+      }
+    ],
+    "artifactHash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "privacy": "content-free-aggregates"
+  }
+}

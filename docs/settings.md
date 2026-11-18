@@ -17,3 +17,7 @@ Blank security or accessibility minimums record results for reporting. A measure
 Set the designated suite, command and line-level coverage report in the target checkout’s `.crap.json`. The project checker wraps the command and records a matching receipt. Missing or stale coverage stays visible. [Coverage configuration and supported report formats](https://github.com/paulboutin/crap-mcp#produce-comparable-coverage).
 
 For a patch, ask the skill to capture its snapshot before editing, particularly in a dirty worktree. Capture a new baseline after changing the rule set or analysis scope. Compare runs that use the same suite and policy.
+
+## Operational workload policy
+
+The Operational health JSON editor configures separate scalability, performance and reliability metrics. The policy uses the same revision check, change history and optional team manifest as the other settings. Evidence stays local. Saving settings does not run tests. See [Operational health](operational-health.md) for the version 1 contract, calibration limits and example.

@@ -31,6 +31,7 @@ interface Review {
 }
 
 export interface Report {
+  operational?: import("./operational-store.ts").OperationalReport;
   patterns?: PatternReport;
   recorded?: boolean;
   auditNotes?: string[];
@@ -1021,31 +1022,46 @@ function recordedCheck(doc: Document, r: RecordedCheck) {
   else byId(doc, "security-detail").textContent = r.security.error ?? "";
 }
 
-export type SourceReport = Pick<Report, "security" | "accessibility"> & {
+export type SourceReport = Pick<
+  Report,
+  "security" | "accessibility" | "operational"
+> & {
   sourceSnapshot: string;
 };
 
 function standaloneSource(doc: Document, r: SourceReport) {
-  const id = r.security ? "security-score" : "access-score";
+  const id = r.operational
+    ? "operational-report"
+    : r.security
+      ? "security-score"
+      : "access-score";
+
   const section = byId(doc, id).closest("section")!;
 
   for (const panel of doc.querySelectorAll("main > :not(.intro)")) {
     if (panel !== section) panel.remove();
   }
 
-  doc.querySelector("h1")!.textContent = r.security
-    ? "Application security findings"
-    : "Accessibility findings";
+  doc.querySelector("h1")!.textContent = r.operational
+    ? "Operational workload evidence"
+    : r.security
+      ? "Application security findings"
+      : "Accessibility findings";
   byId(doc, "meta").textContent = "Snapshot " + r.sourceSnapshot;
   byId(doc, "scan-status").remove();
   securityPanel(doc, r);
   accessibilityPanel(doc, r);
+  operationalPanel(doc, r.operational);
 }
 
 export function renderReport(
   doc: Document,
   r: Report | RecordedCheck | SourceReport,
 ) {
+  byId(doc, "operational-report").closest("section")!.hidden = !(
+    "operational" in r && r.operational
+  );
+
   if ("sourceSnapshot" in r) return standaloneSource(doc, r);
 
   if ("check" in r) return recordedCheck(doc, r);
@@ -1053,6 +1069,7 @@ export function renderReport(
   byId(doc, "access-score").closest("section")!.hidden = !r.accessibility;
   accessibilityPanel(doc, r);
   securityPanel(doc, r);
+  operationalPanel(doc, r.operational);
   projectHistory(doc, r);
   auditContext(doc, r);
   scorePanel(doc, r);
@@ -1063,4 +1080,142 @@ export function renderReport(
   patch(doc, r.review);
   patternPanel(doc, r.patterns, r.functions);
   explorer(doc, r.functions);
+}
+
+function operationalPanel(doc: Document, report: Report["operational"]) {
+  if (!report) return;
+  const panel = byId(doc, "operational-report");
+  panel.replaceChildren();
+  panel.append(
+    element(
+      doc,
+      "p",
+      report.workload ?? "Configure a workload policy in project settings.",
+    ),
+  );
+
+  if (report.evidence)
+    panel.append(
+      element(
+        doc,
+        "p",
+        report.evidence.mode +
+          " · " +
+          report.evidence.environment +
+          " · source " +
+          report.evidence.sourceCommit +
+          " · " +
+          report.evidence.endedAt,
+      ),
+    );
+
+  if (report.evidence) {
+    const e = report.evidence,
+      a = e.attempts;
+
+    panel.append(element(doc, "p", operationalIdentity(e)));
+
+    panel.append(
+      element(
+        doc,
+        "p",
+        `Harness ${e.status} · ${a.offered} offered · ${a.accepted} accepted · ${a.completed} completed · ${a.errors} errors · ${a.cancelled} cancelled · ${a.incomplete} incomplete`,
+      ),
+    );
+    panel.append(
+      element(
+        doc,
+        "p",
+        `Snapshot ${report.snapshot} · policy ${report.policyHash} · evaluated ${report.evaluatedAt}`,
+      ),
+    );
+  }
+
+  if (report.policy)
+    panel.append(
+      element(
+        doc,
+        "p",
+        `Rate confidence ${(report.policy.confidence * 100).toFixed(2)}% · one-sided Hoeffding bound for independent trials. Evidence bounds are not confidence intervals.`,
+      ),
+    );
+
+  for (const axis of report.axes) panel.append(operationalAxis(doc, axis));
+
+  panel.append(
+    element(
+      doc,
+      "p",
+      report.integration +
+        ". " +
+        (report.sourceMatchesHead
+          ? "Declared source matches HEAD; working-tree changes are not measured."
+          : "Evidence source differs from checkout HEAD."),
+    ),
+  );
+  panel.append(element(doc, "p", report.note));
+}
+
+function operationalAxis(
+  doc: Document,
+  axis: NonNullable<Report["operational"]>["axes"][number],
+) {
+  const score =
+    axis.score === null
+      ? "Unrated · bounds " +
+        axis.lower.toFixed(1) +
+        "–" +
+        axis.upper.toFixed(1)
+      : axis.score.toFixed(1) + "/100";
+
+  const section = details(
+    doc,
+    axis.axis + ": " + score + " · " + axis.qualification.state,
+  );
+
+  section.append(
+    element(
+      doc,
+      "p",
+      axis.measured +
+        "/" +
+        axis.total +
+        " metrics · " +
+        axis.evidencePercent.toFixed(1) +
+        "% weighted evidence",
+    ),
+  );
+  section.append(element(doc, "p", axis.qualification.reasons.join("; ")));
+
+  for (const m of axis.metrics)
+    section.append(
+      element(
+        doc,
+        "p",
+        m.label +
+          ": " +
+          (m.raw ?? "unmeasured") +
+          " " +
+          m.unit +
+          " · target " +
+          m.target +
+          " · " +
+          m.samples +
+          " samples · " +
+          (m.reasons.join("; ") || "measured"),
+      ),
+    );
+
+  return section;
+}
+
+function operationalIdentity(
+  e: NonNullable<NonNullable<Report["operational"]>["evidence"]>,
+) {
+  const p = e.provenance;
+
+  if (!p)
+    return "Legacy v1 identity: suite/build/routing/stage tags unavailable; tagged baseline selection requires a new import.";
+
+  return `${p.stage} · suite ${p.suite} · app build ${p.appBuild ?? "not applicable"} · image ${e.imageHash ?? "not applicable"} · routing ${p.routingHash} · source contents ${p.sourceTreeHash}`;
 }

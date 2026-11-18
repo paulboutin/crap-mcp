@@ -13,11 +13,12 @@ After installation, open your project in your coding agent and give it one of th
 | Review a patch for change risk | `Use $crap-development-review to review my patch.` | [Development review](https://paulboutin.github.io/crap-mcp/skills/development-review/) |
 | Inspect application security | `Use $crap-security-review to assess this checkout.` | [Security review](https://paulboutin.github.io/crap-mcp/skills/security-review/) |
 | Check accessibility, contrast and color vision | `Use $crap-accessibility-review to check this UI.` | [Accessibility review](https://paulboutin.github.io/crap-mcp/skills/accessibility-review/) |
+| Review workload capacity, latency and reliability | `Use $crap-operational-review to review my workload evidence.` | [Operational health](docs/operational-health.md) |
 | Pick a maintenance task | `Use $crap-backlog-triage to pick one cleanup.` | [Backlog triage](https://paulboutin.github.io/crap-mcp/skills/backlog-triage/) |
 
 In Claude Code, invoke the same skill with a slash, such as `/crap-security-review`. In OpenCode, ask “Use the crap-security-review skill on this checkout.”
 
-## The five scores
+## Read the scores
 
 | Score | How to read it | Where to start |
 | --- | --- | --- |
@@ -26,6 +27,8 @@ In Claude Code, invoke the same skill with a slash, such as `/crap-security-revi
 | Application security | Higher is better, up to 100. Each enabled OWASP-mapped source match carries a penalty. | [Security score guide](https://paulboutin.github.io/crap-mcp/scores/security/) |
 | Accessibility | Higher is better, up to 100. The report counts known passes and failures and lists pending checks. | [Accessibility score guide](https://paulboutin.github.io/crap-mcp/scores/accessibility/) |
 | Colorblind | Higher is better, up to 100. Each measured pair must meet its contrast target in all three color vision simulations to earn a pass. | [Colorblind score guide](https://paulboutin.github.io/crap-mcp/scores/colorblind/) |
+
+Operational health adds three independent workload scores: **Scalability, Performance and Reliability**, each 0–100, higher is better. Import measurements from a separately authorized harness; missing evidence stays unrated. Configure a workload in project settings and use the [operational review workflow](docs/operational-health.md).
 
 Original code and documentation are available under the [MIT license](LICENSE). See the [contributing guide](CONTRIBUTING.md) for local setup and pull requests, and [third-party notices](THIRD_PARTY_NOTICES.md) for vendored components and language packs.
 

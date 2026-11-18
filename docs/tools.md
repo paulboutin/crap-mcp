@@ -30,3 +30,14 @@ Capture a worktree snapshot before editing if uncommitted changes exist. A revie
 | `record_project_learning` | Record a finding and lesson using before/after check evidence. |
 
 Security, accessibility and CRAP use distinct snapshot IDs. Pass each starting snapshot back to its own review tool. Security and accessibility reviews also accept a pinned `current` snapshot for stable pagination.
+
+## Operational evidence
+
+- `import_operational_evidence`: validate a content-free aggregate object and save an immutable checkout snapshot.
+- `get_operational_scorecard`: read three separate scores, raw evidence and qualification; `format: "markdown"` renders in chat.
+- `review_operational_changes`: compare two imports; incompatible contracts suppress numeric deltas.
+- `scan_operational_risks`: opt-in JS/TS source patterns with confidence and verification recipes.
+- `get_operational_baselines`: page retained worktree/integrated baseline selections and read their revision.
+- `set_operational_baseline`: append a baseline selection without overwriting prior evidence; integrated selections require the exact integration tip.
+
+These tools do not start load or fault tests. See [Operational health](operational-health.md) for the contract and supported scope.

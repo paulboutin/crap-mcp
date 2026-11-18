@@ -5,6 +5,7 @@ import {
 } from "./markdown-card.ts";
 import { backgroundPatterns, savedPatterns } from "./pattern-scan.ts";
 import { linkPatterns } from "./pattern-evidence.ts";
+import { operationalTools } from "./operational-tools.ts";
 import { accessibilityTools } from "./accessibility-tools.ts";
 import { securityTools } from "./security-tools.ts";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -224,6 +225,7 @@ export function analysisServer(select: (id?: string) => Desk, shared: boolean) {
   const scope = { project: shared ? id : z.never().optional() };
   accessibilityTools(server, select, scope);
   securityTools(server, select, scope);
+  operationalTools(server, select, scope);
 
   server.registerTool(
     "scan_code_patterns",

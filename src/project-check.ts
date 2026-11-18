@@ -63,6 +63,7 @@ export async function projectCheck(repo: Repo, note: string) {
   const { settings } = qualityPolicy(repo);
 
   const {
+    operational: _operational,
     accessibilityRules: _accessibilityRules,
     accessibilityPalette: _palette,
     minColorblindScore: _colorTarget,

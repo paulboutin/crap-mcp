@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "profile": "example-service",
+  "sourceRules": [
+    "per-call-client",
+    "promise-fanout"
+  ],
+  "workload": "catalog-read-v1",
+  "maxAgeSeconds": 86400,
+  "minDurationSeconds": 60,
+  "confidence": 0.95,
+  "axes": {
+    "scalability": [
+      {
+        "id": "capacity",
+        "label": "Sustainable capacity ratio",
+        "weight": 1,
+        "unit": "ratio",
+        "direction": "higher",
+        "target": 1.5,
+        "failureThreshold": 0.5,
+        "mandatory": true,
+        "minSamples": 10,
+        "statistic": "scalar"
+      }
+    ],
+    "performance": [
+      {
+        "id": "latency",
+        "label": "All-attempt latency p95",
+        "weight": 1,
+        "unit": "ms",
+        "direction": "lower",
+        "target": 100,
+        "failureThreshold": 500,
+        "mandatory": true,
+        "minSamples": 100,
+        "statistic": "p95"
+      }
+    ],
+    "reliability": [
+      {
+        "id": "bad-events",
+        "label": "Bad-event rate upper bound",
+        "weight": 1,
+        "unit": "ratio",
+        "direction": "lower",
+        "target": 0.001,
+        "failureThreshold": 0.01,
+        "mandatory": true,
+        "minSamples": 1000,
+        "statistic": "bad-rate-upper"
+      }
+    ]
+  }
+}
