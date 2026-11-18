@@ -1113,6 +1113,8 @@ function operationalPanel(doc: Document, report: Report["operational"]) {
     const e = report.evidence,
       a = e.attempts;
 
+    panel.append(element(doc, "p", operationalIdentity(e)));
+
     panel.append(
       element(
         doc,
@@ -1128,6 +1130,15 @@ function operationalPanel(doc: Document, report: Report["operational"]) {
       ),
     );
   }
+
+  if (report.policy)
+    panel.append(
+      element(
+        doc,
+        "p",
+        `Rate confidence ${(report.policy.confidence * 100).toFixed(2)}% · one-sided Hoeffding bound for independent trials. Evidence bounds are not confidence intervals.`,
+      ),
+    );
 
   for (const axis of report.axes) panel.append(operationalAxis(doc, axis));
 
@@ -1196,4 +1207,15 @@ function operationalAxis(
     );
 
   return section;
+}
+
+function operationalIdentity(
+  e: NonNullable<NonNullable<Report["operational"]>["evidence"]>,
+) {
+  const p = e.provenance;
+
+  if (!p)
+    return "Legacy v1 identity: suite/build/routing/stage tags unavailable; tagged baseline selection requires a new import.";
+
+  return `${p.stage} · suite ${p.suite} · app build ${p.appBuild ?? "not applicable"} · image ${e.imageHash ?? "not applicable"} · routing ${p.routingHash} · source contents ${p.sourceTreeHash}`;
 }

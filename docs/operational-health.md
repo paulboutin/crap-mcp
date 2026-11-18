@@ -40,7 +40,7 @@ Qualification is separate from the number: `unmeasured`, `measured-below-target`
 
 ## Evidence version 1
 
-Evidence is passed as an object, not an executable command, file path or URL. No artifacts are fetched automatically. Hash fields are lowercase SHA-256 hex; `sourceCommit` is the exact local Git commit object ID (40 or 64 characters). The source commit must exist in the registered repository. Obtain `repository` and `policyHash` from the data scorecard, not by guessing them. Remote repository identity is hashed from the configured origin URL with its trailing `.git` removed; URL aliases are intentionally not treated as identical. Without origin, identity is local to the shared Git store. Copies on other machines should configure the same origin.
+Evidence is passed as an object, not an executable command, file path or URL. No artifacts are fetched automatically. Hash fields are lowercase SHA-256 hex; `imageHash` may be null only for the app-build case below; `sourceCommit` is the exact local Git commit object ID (40 or 64 characters). The source commit must exist in the registered repository. Obtain `repository` and `policyHash` from the data scorecard, not by guessing them. Remote repository identity is hashed from the configured origin URL with its trailing `.git` removed; URL aliases are intentionally not treated as identical. Without origin, identity is local to the shared Git store. Copies on other machines should configure the same origin.
 
 Required provenance: `repository`, `sourceCommit`, `imageHash`, `configHash`, `policyHash`, `workload`, `workloadHash`, `datasetHash`, `harnessVersion`, `environment`, `deployment`, `mode`, `resources`, `model` (nullable), `corpusHash` (nullable), `artifactHash`, and `privacy:"content-free-aggregates"`. Resources are `{name,value,unit}` entries describing host/hardware allocation. Mode is `synthetic`, `local`, `staging` or `production`; modes never compare implicitly.
 
@@ -75,3 +75,27 @@ Snapshots retain the exact parsed policy and evidence and are content-addressed 
 Workload-specific profiles can define capacity/headroom, efficiency, burst recovery and cost metrics, or startup, confirmation, acceptance, retrieval and active-loop timings. Proposed weighting families such as 40/20/25/15 for scalability or 40/25/25/10 for reliability are design choices requiring calibration. They are not built-in empirical standards. Choose paired p95/p99 weights explicitly. The example's scalar capacity ratio requires an independently measured sustained workload with its SLO gate passing; a configured limit is not sustainable capacity.
 
 Production adapters, harness execution, histogram merging, confidence methods beyond the conservative bound, richer infrastructure analysis, and automatic operational CI gates are future extensions. The existing project checker and CRAP CI gate are unchanged by enabling an operational policy. This slice adds validated evidence, qualification, comparison and report surfaces that future collectors can use.
+
+## Tagged baselines and v1 compatibility
+
+Version 1 imports now accept an optional `provenance` object. Its absence remains valid for earlier collectors and persisted snapshots; there are no new defaults inserted into old evidence, so original content hashes and snapshot IDs remain unchanged. Older servers with the original strict schema will reject the new fields; update the server before a producer sends them. Compatibility here means that existing collectors and snapshots continue working on the updated server. Legacy cards label missing provenance. They retain numeric behavior but are ineligible for the new tagged baseline selection workflow.
+
+```json
+{
+  "suite": "journey-replay-v1",
+  "appBuild": "desktop/2.0+42",
+  "routingHash": "1111111111111111111111111111111111111111111111111111111111111111",
+  "sourceTreeHash": "2222222222222222222222222222222222222222222222222222222222222222",
+  "stage": "worktree"
+}
+```
+
+These are fictional placeholders for the format. Record the actual suite, app build, SHA-256 routing configuration and SHA-256 measured source-content identity from the harness. `sourceCommit` still records the exact Git SHA. `sourceTreeHash` distinguishes worktree contents from that commit; the MCP cannot attest that an external build used the declared bytes. `imageHash` is the actual deployed image's SHA-256 digest without the `sha256:` prefix, not a tag or a source hash. It may now be null for an app-only measurement with a nonempty `appBuild`. At least one image/build identity is required; use both for a journey spanning client and server. Model, deployment, environment, workload/data versions, policy hash, counters and per-metric samples remain in the main evidence object.
+
+`get_operational_baselines({project})` returns a revision and paged selections. `set_operational_baseline({project,snapshot,revision,reason})` appends a selection referencing an immutable import. It retains previous entries and snapshot bytes; `previous` links the prior selection in the same workload/environment/mode/suite and worktree/integrated lane. Select a partial or failed starting observation when useful: its missing measurements stay null, and selection never improves its score. Changed policy candidates must be reimported under the new policy. Revision conflicts require a reload. Selection uses a local filesystem lock across MCP processes; after a crashed writer, verify it has stopped before removing the empty `operational/baseline-selection.lock` directory from the checkout's Git-local store.
+
+For `stage:"integrated"`, selection requires `sourceCommit` to equal the **exact current configured integration revision**, not merely an ancestor. Update that reference deliberately, rerun the workload for the integrated image/app build, and import the fresh observation. A source ancestor remains historical evidence. The registry is per checkout; it does not copy measurements across checkouts or merge source branches.
+
+Comparisons require matching suite tags. Legacy-to-tagged comparisons are labeled incompatible and produce no deltas. Routing changes require the same explicit `allowConfigChange:true` acknowledgement as configuration changes. App-build, source-content and stage changes are listed as experiment identities; they do not imply causality. Cards show the declared rate-confidence level and sample counts separately from weighted evidence coverage. Provisional score bounds are not confidence intervals.
+
+The machine installer includes the operational skill and this guide. After updating an already connected service, a coding harness may need to refresh/reconnect its MCP tool list to discover the six operational tools. The HTTP endpoint remains the same. Installing a development branch locally does not merge its pull request or alter any application deployment.

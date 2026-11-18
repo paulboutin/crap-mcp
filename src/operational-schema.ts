@@ -178,8 +178,8 @@ export const operationalEvidence = z
   .object({
     version: z.literal(1),
     repository: hash,
-    sourceCommit: z.string().regex(/^[a-f0-9]{40,64}$/),
-    imageHash: hash,
+    sourceCommit: z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/),
+    imageHash: hash.nullable(),
     configHash: hash,
     policyHash: hash,
     workload: label,
@@ -226,8 +226,23 @@ export const operationalEvidence = z
       .max(100),
     artifactHash: hash,
     privacy: z.literal("content-free-aggregates"),
+    // Optional and without defaults so existing v1 snapshot hashes stay valid.
+    provenance: z
+      .object({
+        suite: label,
+        appBuild: label.nullable(),
+        routingHash: hash,
+        sourceTreeHash: hash,
+        stage: z.enum(["worktree", "integrated"]),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
+  .refine(
+    (e) => e.imageHash !== null || Boolean(e.provenance?.appBuild),
+    "Provide an actual image digest or an app build identity",
+  )
   .refine((e) => {
     return new Set(e.faults.map((f) => f.name)).size === e.faults.length;
   }, "Duplicate fault cases")

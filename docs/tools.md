@@ -37,5 +37,7 @@ Security, accessibility and CRAP use distinct snapshot IDs. Pass each starting s
 - `get_operational_scorecard`: read three separate scores, raw evidence and qualification; `format: "markdown"` renders in chat.
 - `review_operational_changes`: compare two imports; incompatible contracts suppress numeric deltas.
 - `scan_operational_risks`: opt-in JS/TS source patterns with confidence and verification recipes.
+- `get_operational_baselines`: page retained worktree/integrated baseline selections and read their revision.
+- `set_operational_baseline`: append a baseline selection without overwriting prior evidence; integrated selections require the exact integration tip.
 
 These tools do not start load or fault tests. See [Operational health](operational-health.md) for the contract and supported scope.

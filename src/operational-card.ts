@@ -24,6 +24,26 @@ function axisRow(a: Axis) {
   return `| ${a.axis} | ${score} | ${a.measured}/${a.total} · ${a.evidencePercent.toFixed(1)}% | ${bounds} | ${cell(a.qualification.state)} |`;
 }
 
+function buildIdentity(report: OperationalReport) {
+  const e = report.evidence,
+    p = e?.provenance;
+
+  if (!e) return [];
+
+  if (!p)
+    return [
+      "",
+      "Identity: legacy v1; suite/app-build/routing/stage tags unavailable. No tagged baseline promotion.",
+    ];
+
+  return [
+    "",
+    `Identity: ${cell(p.stage)} · suite ${cell(p.suite)} · app build ${cell(p.appBuild ?? "not applicable")} · image ${e?.imageHash ?? "not applicable"}`,
+    "",
+    `Routing: ${p.routingHash} · source contents: ${p.sourceTreeHash}`,
+  ];
+}
+
 function provenance(report: OperationalReport) {
   const e = report.evidence;
 
@@ -117,7 +137,12 @@ export function operationalMarkdown(
     "Workload: " + cell(report.workload ?? "unconfigured"),
     "",
     report.note,
+    "",
+    report.policy
+      ? `Rate confidence: ${(report.policy.confidence * 100).toFixed(2)}% · one-sided Hoeffding bound · independent trials required. Evidence bounds are not confidence intervals.`
+      : "Rate confidence: unconfigured.",
     ...provenance(report),
+    ...buildIdentity(report),
     ...metricTable(report),
   );
 

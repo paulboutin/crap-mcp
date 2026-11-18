@@ -1,3 +1,7 @@
+import {
+  operationalBaselines,
+  selectOperationalBaseline,
+} from "../src/operational-baselines.ts";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
@@ -551,6 +555,50 @@ test("HTTP MCP imports and renders per-project operational scores in dashboard a
 
   assert.match(JSON.stringify(review.content), /Comparable/);
 
+  const initialBaselines = await client.callTool({
+    name: "get_operational_baselines",
+    arguments: { project: id },
+  });
+
+  assert.ok(initialBaselines.content[0].type === "text");
+
+  const baselineRevision = JSON.parse(
+    initialBaselines.content[0].text,
+  ).revision;
+
+  const tagged = await client.callTool({
+    name: "import_operational_evidence",
+    arguments: { project: id, evidence: taggedEvidence(repo) },
+  });
+
+  assert.ok(!tagged.isError);
+  assert.ok(tagged.content[0].type === "text");
+  const taggedSnapshot = JSON.parse(tagged.content[0].text).snapshot;
+
+  const savedBaseline = await client.callTool({
+    name: "set_operational_baseline",
+    arguments: {
+      project: id,
+      snapshot: taggedSnapshot,
+      revision: baselineRevision,
+      reason: "HTTP baseline acceptance",
+    },
+  });
+
+  assert.ok(!savedBaseline.isError, JSON.stringify(savedBaseline.content));
+
+  const staleBaseline = await client.callTool({
+    name: "set_operational_baseline",
+    arguments: {
+      project: id,
+      snapshot: taggedSnapshot,
+      revision: baselineRevision,
+      reason: "Stale HTTP writer",
+    },
+  });
+
+  assert.ok(staleBaseline.isError);
+
   const risk = await client.callTool({
     name: "scan_operational_risks",
     arguments: { project: id },
@@ -679,4 +727,203 @@ test("confidence requirements and cost basis cannot be bypassed by a scalar reli
   const score = operationalScores(workloadPolicy(), tiny)[2];
   assert.equal(score.score, null);
   assert.match(score.metrics[0].reasons.join(" "), /Insufficient/);
+});
+
+function taggedEvidence(repo: ReturnType<typeof repository>) {
+  const e = boundEvidence(repo);
+  e.provenance = {
+    suite: "journey-replay-v1",
+    appBuild: null,
+    routingHash: "1".repeat(64),
+    sourceTreeHash: "2".repeat(64),
+    stage: "worktree",
+  };
+
+  return e;
+}
+
+test("original version-1 snapshots keep their IDs and null measurements remain null after the additive import extension", (t) => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "crap-legacy-")));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const repo = makeRepo(dir);
+
+  const fixture = JSON.parse(
+    readFileSync(
+      new URL("fixtures/operational/legacy-v1.json", import.meta.url),
+      "utf8",
+    ),
+  );
+
+  mkdirSync(join(repo.local, "operational"), { recursive: true });
+  writeFileSync(
+    join(repo.local, "operational", fixture.id + ".json"),
+    JSON.stringify(fixture),
+  );
+  const loaded = operationalSnapshot(repo, fixture.id);
+  assert.deepEqual(loaded, fixture);
+  assert.equal(loaded.evidence.provenance, undefined);
+  assert.ok(
+    operationalReport(repo, fixture.id).axes.every((a) => a.score === null),
+  );
+  const history = operationalBaselines(repo);
+  assert.throws(
+    () =>
+      selectOperationalBaseline(repo, {
+        snapshot: fixture.id,
+        revision: history.revision,
+        reason: "legacy",
+      }),
+    /Legacy evidence/,
+  );
+  assert.equal(operationalSnapshot(repo, fixture.id).id, fixture.id);
+});
+
+test("baseline selections retain old evidence, reject conflicts and require the exact integrated revision", (t) => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "crap-baselines-")));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const repo = makeRepo(dir);
+  setPolicy(repo);
+  const e = taggedEvidence(repo);
+  e.metrics = [];
+  const first = importOperational(repo, e);
+  const empty = operationalBaselines(repo);
+
+  const selected = selectOperationalBaseline(repo, {
+    snapshot: first.snapshot!,
+    revision: empty.revision,
+    reason: "Preserve missing starting measurements",
+  });
+
+  assert.ok(selected.scorecard.axes.every((a) => a.score === null));
+  const changed = taggedEvidence(repo);
+  changed.provenance!.sourceTreeHash = "3".repeat(64);
+  const second = importOperational(repo, changed);
+  assert.throws(
+    () =>
+      selectOperationalBaseline(repo, {
+        snapshot: second.snapshot!,
+        revision: empty.revision,
+        reason: "stale writer",
+      }),
+    /changed/,
+  );
+
+  const next = selectOperationalBaseline(repo, {
+    snapshot: second.snapshot!,
+    revision: selected.revision,
+    reason: "Measured candidate",
+  });
+
+  assert.equal(next.entry.previous, selected.entry.id);
+  assert.deepEqual(
+    operationalSnapshot(repo, first.snapshot!).evidence.metrics,
+    [],
+  );
+  const page = operationalBaselines(repo, 0, 1);
+  assert.equal(page.total, 2);
+  assert.equal(page.nextOffset, 1);
+  assert.equal(
+    operationalBaselines(repo, 1, 1).entries[0].snapshot,
+    first.snapshot,
+  );
+  git(dir, "commit", "--allow-empty", "-qm", "integration advances");
+
+  const oldIntegrated = {
+    ...changed,
+    provenance: { ...changed.provenance!, stage: "integrated" as const },
+  };
+
+  const old = importOperational(repo, oldIntegrated);
+  assert.throws(
+    () =>
+      selectOperationalBaseline(repo, {
+        snapshot: old.snapshot!,
+        revision: next.revision,
+        reason: "ancestor is not a rerun",
+      }),
+    /exact current integration/,
+  );
+  const integrated = taggedEvidence(repo);
+  integrated.provenance!.stage = "integrated";
+  const fresh = importOperational(repo, integrated);
+
+  const promoted = selectOperationalBaseline(repo, {
+    snapshot: fresh.snapshot!,
+    revision: next.revision,
+    reason: "Fresh measurement at integrated tip",
+  });
+
+  assert.equal(
+    promoted.entry.integrationCommit,
+    git(dir, "rev-parse", "main").trim(),
+  );
+  assert.equal(promoted.entry.previous, null);
+  assert.equal(operationalBaselines(repo).total, 3);
+  const oldBytes = JSON.stringify(operationalSnapshot(repo, second.snapshot!));
+  git(dir, "commit", "--allow-empty", "-qm", "next integration");
+  const latest = taggedEvidence(repo);
+  latest.provenance!.stage = "integrated";
+  const newest = importOperational(repo, latest);
+
+  const newer = selectOperationalBaseline(repo, {
+    snapshot: newest.snapshot!,
+    revision: promoted.revision,
+    reason: "Next integrated baseline",
+  });
+
+  assert.equal(newer.entry.previous, promoted.entry.id);
+  assert.equal(
+    JSON.stringify(operationalSnapshot(repo, second.snapshot!)),
+    oldBytes,
+  );
+  assert.equal(operationalBaselines(repo).total, 4);
+  assert.equal(
+    operationalBaselines(repo).entries[3].evidence.provenance!.stage,
+    "worktree",
+  );
+});
+
+test("suite and routing identity constrain comparison; app builds are explicit source changes", (t) => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "crap-provenance-")));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const repo = makeRepo(dir);
+  setPolicy(repo);
+
+  const e = taggedEvidence(repo),
+    other = structuredClone(e);
+
+  assert.equal(compareOperational(e, other).comparable, true);
+  other.provenance!.suite = "different-suite";
+  assert.deepEqual(compareOperational(e, other).mismatches, ["suite"]);
+  other.provenance!.suite = e.provenance!.suite;
+  other.provenance!.routingHash = "4".repeat(64);
+  assert.deepEqual(compareOperational(e, other).mismatches, ["routingHash"]);
+  assert.equal(compareOperational(e, other, true).comparable, true);
+  other.provenance!.appBuild = "desktop/2.0+42";
+  other.imageHash = null;
+  assert.ok(operationalEvidence.safeParse(other).success);
+  assert.equal(
+    compareOperational(e, other, true).changes.some(
+      (c) => c.field === "appBuild",
+    ),
+    true,
+  );
+  assert.equal(
+    operationalEvidence.safeParse({
+      ...other,
+      provenance: { ...other.provenance, appBuild: null },
+    }).success,
+    false,
+  );
+  const legacy = structuredClone(e);
+  delete legacy.provenance;
+  assert.ok(
+    compareOperational(e, legacy).mismatches.includes("provenance version"),
+  );
+  const imported = importOperational(repo, other);
+  const card = operationalMarkdown(imported);
+  assert.match(card, /journey-replay-v1/);
+  assert.match(card, /desktop\/2.0\+42/);
+  assert.match(card, /95.00%/);
+  assert.match(card, /worktree/);
 });

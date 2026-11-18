@@ -256,6 +256,34 @@ export function operationalScores(
   return operationalAxes.map((axis) => axisScore(axis, p, e, reasons));
 }
 
+function compareProvenance(
+  before: OperationalEvidence,
+  after: OperationalEvidence,
+  allowConfigChange: boolean,
+) {
+  const a = before.provenance,
+    b = after.provenance;
+
+  const mismatches: string[] = [];
+
+  if (Boolean(a) !== Boolean(b)) mismatches.push("provenance version");
+
+  if (a?.suite !== b?.suite) mismatches.push("suite");
+
+  if (!allowConfigChange && a?.routingHash !== b?.routingHash)
+    mismatches.push("routingHash");
+
+  const changes = (
+    ["appBuild", "routingHash", "sourceTreeHash", "stage"] as const
+  ).flatMap((field) =>
+    a?.[field] === b?.[field]
+      ? []
+      : [{ field, before: a?.[field] ?? null, after: b?.[field] ?? null }],
+  );
+
+  return { mismatches, changes };
+}
+
 export function compareOperational(
   before: OperationalEvidence,
   after: OperationalEvidence,
@@ -315,5 +343,12 @@ export function compareOperational(
       : [{ field: key, before: before[key], after: after[key] }],
   );
 
-  return { comparable: !mismatches.length, mismatches, changes };
+  const provenance = compareProvenance(before, after, allowConfigChange);
+  mismatches.push(...provenance.mismatches);
+
+  return {
+    comparable: !mismatches.length,
+    mismatches,
+    changes: [...changes, ...provenance.changes],
+  };
 }

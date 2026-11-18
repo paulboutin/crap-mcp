@@ -1,3 +1,8 @@
+import {
+  operationalBaselines,
+  selectOperationalBaseline,
+  baselineSelection,
+} from "./operational-baselines.ts";
 import { saveFindingReport } from "./report-html.ts";
 import { artifactLink } from "./markdown-card.ts";
 import type { OperationalReport } from "./operational-store.ts";
@@ -37,6 +42,7 @@ export function operationalTools(
   select: (id?: string) => Desk,
   scope: { project: z.ZodString | z.ZodOptional<z.ZodNever> },
 ) {
+  baselineTools(server, select, scope);
   server.registerTool(
     "import_operational_evidence",
     {
@@ -131,5 +137,56 @@ export function operationalTools(
         },
       ],
     }),
+  );
+}
+
+function baselineTools(
+  server: McpServer,
+  select: (id?: string) => Desk,
+  scope: { project: z.ZodString | z.ZodOptional<z.ZodNever> },
+) {
+  server.registerTool(
+    "get_operational_baselines",
+    {
+      description:
+        "Read retained worktree/integrated baseline selections, their source/build/configuration and immutable evidence IDs. Use the returned revision for selection; old selections remain available.",
+      inputSchema: {
+        ...scope,
+        offset: z.number().int().min(0).default(0),
+        limit: z.number().int().min(1).max(50).default(20),
+      },
+    },
+    (q) => ({
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            operationalBaselines(select(q.project).repo, q.offset, q.limit),
+          ),
+        },
+      ],
+    }),
+  );
+  server.registerTool(
+    "set_operational_baseline",
+    {
+      description:
+        "Record a baseline selection without deleting previous baselines or changing measured scores. Requires tagged evidence and the current baseline revision. Integrated evidence must bind the exact integration tip, not merely an ancestor. Partial evidence remains unrated.",
+      inputSchema: baselineSelection.extend(scope),
+    },
+    (q) => {
+      const { project, ...input } = q;
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              selectOperationalBaseline(select(project).repo, input),
+            ),
+          },
+        ],
+      };
+    },
   );
 }

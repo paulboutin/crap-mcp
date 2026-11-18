@@ -31,6 +31,9 @@ mkdir -p "$release/tools/oxlint" "$release/scripts"
 cp -R tools/oxlint/anti-slop "$release/tools/oxlint/"
 cp scripts/dashboard.mjs scripts/ensure-service.sh scripts/connect-clients.sh scripts/opencode-config.mjs "$release/scripts/"
 cp -R .agents/skills "$release/.agents/"
+mkdir -p "$release/docs/examples"
+cp docs/operational-health.md "$release/docs/"
+cp docs/examples/operational-policy.json "$release/docs/examples/"
 (cd "$release" && npm ci --omit=dev --no-audit --no-fund)
 previous=$(readlink "$data/current" || true)
 switch_release() {
