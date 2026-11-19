@@ -1,5 +1,6 @@
-import { accessibilityCheck } from "./accessibility.ts";
-import { securityCheck } from "./security.ts";
+import { boundedSourceCheck } from "./source-check.ts";
+import { randomUUID } from "node:crypto";
+import { delimiter, dirname } from "node:path";
 import { runTrial } from "./experiments.ts";
 import { adapter } from "./languages.ts";
 import { spawnSync } from "node:child_process";
@@ -42,6 +43,8 @@ function outcome(run: CheckRun): CheckRun["outcome"] {
   ];
 
   if (sourceChecks.includes("failed")) return "failed";
+
+  if (run.error) return "incomplete";
   const metrics = metricOutcome(run.metrics);
 
   return metrics === "passed" && sourceChecks.includes("incomplete")
@@ -75,9 +78,14 @@ export async function projectCheck(repo: Repo, note: string) {
 
   const start = fingerprint(repo);
 
-  const patterns = capturePatterns(repo, start);
-
   const run: CheckRun = {
+    attempt: randomUUID(),
+    phase: "patterns",
+    runtime: {
+      executable: process.execPath,
+      version: process.version,
+      architecture: process.arch,
+    },
     at: new Date().toISOString(),
     note,
     thresholds: {
@@ -94,15 +102,26 @@ export async function projectCheck(repo: Repo, note: string) {
       ]),
     ),
     run: null,
-    lint: patterns.lint,
-    patternSnapshot: patterns.id,
-    tools: nativeChecks(repo, settings),
-    trials: repo.config.experiments?.map((spec) => runTrial(repo.root, spec)),
-    tests: "unconfigured",
+    lint: { files: 0, violations: 0, rules: {}, error: "Not measured yet" },
+    tools: [],
+    tests: repo.config.command ? "unverified" : "unconfigured",
     metrics: null,
     error: null,
     outcome: "incomplete",
   };
+
+  saveRun(repo, run);
+  const patterns = capturePatterns(repo, start);
+  run.lint = patterns.lint;
+  run.patternSnapshot = patterns.id;
+  run.phase = "tools";
+  saveRun(repo, run);
+  run.tools = nativeChecks(repo, settings);
+  run.trials = repo.config.experiments?.map((spec) =>
+    runTrial(repo.root, spec),
+  );
+  run.phase = "tests";
+  saveRun(repo, run);
 
   const command = repo.config.command;
 
@@ -117,6 +136,8 @@ export async function projectCheck(repo: Repo, note: string) {
 
       run.run = receipt.run;
       run.tests = "passed";
+      run.phase = "metrics";
+      saveRun(repo, run);
       const s = await scan(repo, { done: 0, total: 0 }, new Map());
 
       if (
@@ -134,12 +155,30 @@ export async function projectCheck(repo: Repo, note: string) {
     }
   }
 
-  run.accessibility = accessibilityCheck(
-    repo,
-    settings.minAccessibilityScore,
-    settings.minColorblindScore,
-  );
-  run.security = securityCheck(repo, settings.minSecurityScore);
+  for (const kind of ["accessibility", "security"] as const) {
+    run.phase = kind;
+    saveRun(repo, run);
+
+    try {
+      Object.assign(
+        run,
+        await boundedSourceCheck({
+          root: repo.root,
+          kind,
+          minimum:
+            kind === "security"
+              ? settings.minSecurityScore
+              : settings.minAccessibilityScore,
+          colorMinimum: settings.minColorblindScore,
+        }),
+      );
+    } catch (error) {
+      run.error = [run.error, String(error)].filter(Boolean).join("; ");
+    }
+  }
+
+  run.phase = "complete";
+  run.completedAt = new Date().toISOString();
   run.outcome = outcome(run);
   saveRun(repo, run);
 
@@ -147,6 +186,11 @@ export async function projectCheck(repo: Repo, note: string) {
 }
 
 if (import.meta.main) {
+  // Shell PATH changes must not silently switch npm and its workers to another Node.
+  process.env.PATH = [dirname(process.execPath), process.env.PATH ?? ""].join(
+    delimiter,
+  );
+
   const result = await projectCheck(
     repository(process.cwd()),
     process.argv.slice(2).join(" ").slice(0, 2000),

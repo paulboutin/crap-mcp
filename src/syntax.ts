@@ -218,10 +218,30 @@ export function withSyntax<T>(
   id: string,
   source: string,
   inspect: (root: Node) => T,
+  budgetMs = 5000,
 ) {
-  const tree = parsers.get(adapter(id).version)!.parse(source);
+  const parser = parsers.get(adapter(id).version)!;
+  const deadline = performance.now() + budgetMs;
+  let expired = false;
+  // A cancelled parse must never resume against the next source file.
+  parser.reset();
 
-  if (!tree) throw Error("Parser did not produce a tree");
+  const tree = parser.parse(source, undefined, {
+    progressCallback: () => {
+      expired = performance.now() >= deadline;
+
+      return expired;
+    },
+  });
+
+  if (!tree) {
+    parser.reset();
+    throw Error(
+      expired
+        ? `Parser exceeded ${budgetMs} ms budget; source unassessed`
+        : "Parser did not produce a tree",
+    );
+  }
 
   try {
     if (tree.rootNode.hasError)
@@ -230,5 +250,6 @@ export function withSyntax<T>(
     return inspect(tree.rootNode);
   } finally {
     tree.delete();
+    parser.reset();
   }
 }

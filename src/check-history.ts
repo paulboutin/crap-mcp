@@ -32,6 +32,11 @@ export function measurements(s: Snapshot, targets: Targets) {
 }
 
 export interface CheckRun {
+  attempt?: string;
+  checkpoint?: number;
+  phase?: string;
+  completedAt?: string;
+  runtime?: { executable: string; version: string; architecture: string };
   patternSnapshot?: string;
   thresholds?: { maxCrap: number; minCoverage: number };
   accessibility?: ReturnType<
@@ -59,11 +64,17 @@ export interface CheckRun {
 }
 
 export function saveRun(repo: Repo, run: CheckRun) {
+  if (run.attempt) run.checkpoint = (run.checkpoint ?? 0) + 1;
+
+  const checkpoint = run.attempt
+    ? String(run.checkpoint).padStart(6, "0") + "-"
+    : "";
+
   writeJson(
     join(
       repo.local,
       "checks",
-      run.at.replaceAll(":", "-") + "-" + randomUUID() + ".json",
+      run.at.replaceAll(":", "-") + "-" + checkpoint + randomUUID() + ".json",
     ),
     run,
   );
@@ -74,10 +85,20 @@ export function recentRuns(repo: Repo): CheckRun[] {
 
   if (!existsSync(dir)) return [];
 
+  const attempts = new Set<string>();
+
   return readdirSync(dir)
     .filter((name) => name.endsWith(".json"))
     .sort()
     .reverse()
-    .slice(0, 30)
-    .map((name) => JSON.parse(readFileSync(join(dir, name), "utf8")));
+    .map((name) => JSON.parse(readFileSync(join(dir, name), "utf8")))
+    .filter((run: CheckRun) => {
+      if (!run.attempt) return true;
+
+      if (attempts.has(run.attempt)) return false;
+      attempts.add(run.attempt);
+
+      return true;
+    })
+    .slice(0, 30);
 }
