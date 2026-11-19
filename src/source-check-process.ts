@@ -1,4 +1,3 @@
-import { parentPort, workerData } from "node:worker_threads";
 import { repository } from "./files.ts";
 import { accessibilityCheck } from "./accessibility.ts";
 import { securityCheck } from "./security.ts";
@@ -10,8 +9,7 @@ export interface SourceCheckRequest {
   colorMinimum?: number | null;
 }
 
-if (parentPort) {
-  const request: SourceCheckRequest = workerData;
+process.once("message", (request: SourceCheckRequest) => {
   const repo = repository(request.root);
 
   const result =
@@ -25,5 +23,5 @@ if (parentPort) {
           ),
         };
 
-  parentPort.postMessage(result);
-}
+  process.send?.(result);
+});

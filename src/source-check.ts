@@ -1,25 +1,32 @@
-import { Worker } from "node:worker_threads";
+import { fork } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import type { CheckRun } from "./check-history.ts";
-import type { SourceCheckRequest } from "./source-check-worker.ts";
+import type { SourceCheckRequest } from "./source-check-process.ts";
 
 type SourceResult = Pick<CheckRun, "security" | "accessibility">;
 
-// Worker termination remains available when a grammar cannot call its progress callback.
+// A separate process contains native/WASM faults as well as non-cooperative parsing.
 export function boundedSourceCheck(
   request: SourceCheckRequest,
   budgetMs = 120000,
   entry = new URL(
     import.meta.url.endsWith(".ts")
-      ? "./source-check-worker.ts"
-      : "./source-check-worker.js",
+      ? "./source-check-process.ts"
+      : "./source-check-process.js",
     import.meta.url,
   ),
 ) {
-  const worker = new Worker(entry, { workerData: request });
+  const worker = fork(fileURLToPath(entry), [], {
+    execPath: process.execPath,
+    execArgv: [],
+    stdio: ["ignore", "ignore", "ignore", "ipc"],
+  });
+
+  worker.send(request);
 
   return new Promise<SourceResult>((resolve, reject) => {
     const timer = setTimeout(() => {
-      void worker.terminate();
+      worker.kill("SIGKILL");
       reject(
         Error(
           `${request.kind} scan exceeded ${budgetMs} ms; source check unassessed`,
@@ -29,6 +36,7 @@ export function boundedSourceCheck(
 
     worker.once("message", (result: SourceResult) => {
       clearTimeout(timer);
+      worker.disconnect();
       resolve(result);
     });
     worker.once("error", (error) => {
@@ -37,7 +45,7 @@ export function boundedSourceCheck(
     });
     worker.once("exit", (code) => {
       clearTimeout(timer);
-      reject(Error(`${request.kind} worker exited (${code}) before a result`));
+      reject(Error(`${request.kind} process exited (${code}) before a result`));
     });
   });
 }
