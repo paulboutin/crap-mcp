@@ -31,6 +31,26 @@
   "changes": [],
   "lessons": [
     {
+      "before": "2026-11-19T21:39:52.344Z",
+      "after": "2026-11-19T21:43:20.081Z",
+      "finding": "projectCheck lost observed suite results when an ancillary native grammar did not return; CLI child processes could also select a different Node runtime through PATH.",
+      "conclusion": "Reproduced an unbounded post-suite security parse. Exact installed-source baseline and repaired self-check both pass their designated suite. Synthetic interruption and non-cooperative process tests verify immutable progress checkpoints and bounded failure without false passing evidence. The repaired checker completed a full external application run and retained its passing tests plus existing code-quality failures. Intermediate dogfood complexity regressions were corrected; outcome CRAP 9 to 6, saveRun 1 to 4, withSyntax 3 to 4. No application speed or cost improvement is inferred.",
+      "nextRule": "Keep suite outcomes durable before ancillary analysis, isolate non-cooperative native grammars, report timed-out scopes as unassessed, and preserve the selected Node runtime across subprocesses. Use completed comparable run timestamps for learning records; interruption is not a successful baseline.",
+      "evidence": [
+        "Suite unit: passed · check passed",
+        "Before 2026-11-19T21:39:52.344Z (passed, unit tests passed) → after 2026-11-19T21:43:20.081Z (passed)",
+        "Highest measured CRAP: 23.59 → 23.59 (736/736 → 748/748 functions scored)",
+        "Replay 48 TypeScript functions · qa: passed → passed",
+        "Parse the fixture ten times · benchmark: passed → passed",
+        "Median 26.70 ms across 5 samples (previous 19.92 ms, change 6.78 ms)",
+        "Session health: 9.7/10\n19/19 remaining affected functions scored; 1 removed; 0 files unassessed.\nFinding changes: none.\nCRAP (lower is better, high above 30) · src/project-check.ts:31 · outcome: 9.00 → 6.00\nCRAP (lower is better, high above 30) · src/check-history.ts:66 · saveRun: 1.00 → 4.00\nCRAP (lower is better, high above 30) · src/syntax.ts:217 · withSyntax: 3.00 → 4.00"
+      ],
+      "beforeSnapshot": "c81ca5921d78e06a8747bf1afb8f9548b26fd1b3d1b49cd36404eeab89b25f8d",
+      "afterSnapshot": "6a823071a598609bfcaacac9fbeda88ffff86da1ee6de17cb9fc407dfd91f15f",
+      "beforeCommit": "233068d418e9997e672feece906019a1f2b9ad55",
+      "afterCommit": "78101f7a75b266e5567a05dd72379e0953286ab0"
+    },
+    {
       "before": "2026-11-07T22:18:18.806Z",
       "after": "2026-11-07T22:23:47.024Z",
       "finding": "src/check-comparison.ts · compareChecks mixed workload matching, formatting and risk comparison",
