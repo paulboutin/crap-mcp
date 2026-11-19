@@ -36,6 +36,10 @@ function outcome(run: CheckRun): CheckRun["outcome"] {
   if (run.lint.error || run.lint.violations || run.tests === "failed")
     return "failed";
 
+  return sourceOutcome(run);
+}
+
+function sourceOutcome(run: CheckRun): CheckRun["outcome"] {
   const sourceChecks = [
     run.security?.status,
     run.accessibility?.status,
@@ -62,9 +66,31 @@ function metricOutcome(m: CheckRun["metrics"]): CheckRun["outcome"] {
     : "passed";
 }
 
-export async function projectCheck(repo: Repo, note: string) {
-  const { settings } = qualityPolicy(repo);
+async function checkSources(repo: Repo, run: CheckRun, settings: Targets) {
+  for (const kind of ["accessibility", "security"] as const) {
+    run.phase = kind;
+    saveRun(repo, run);
 
+    try {
+      Object.assign(
+        run,
+        await boundedSourceCheck({
+          root: repo.root,
+          kind,
+          minimum:
+            kind === "security"
+              ? settings.minSecurityScore
+              : settings.minAccessibilityScore,
+          colorMinimum: settings.minColorblindScore,
+        }),
+      );
+    } catch (error) {
+      run.error = [run.error, String(error)].filter(Boolean).join("; ");
+    }
+  }
+}
+
+function beginCheck(repo: Repo, note: string, settings: Targets): CheckRun {
   const {
     operational: _operational,
     accessibilityRules: _accessibilityRules,
@@ -75,8 +101,6 @@ export async function projectCheck(repo: Repo, note: string) {
     minSecurityScore: _target,
     ...checkSettings
   } = settings;
-
-  const start = fingerprint(repo);
 
   const run: CheckRun = {
     attempt: randomUUID(),
@@ -111,6 +135,15 @@ export async function projectCheck(repo: Repo, note: string) {
   };
 
   saveRun(repo, run);
+
+  return run;
+}
+
+export async function projectCheck(repo: Repo, note: string) {
+  const { settings } = qualityPolicy(repo);
+
+  const start = fingerprint(repo);
+  const run = beginCheck(repo, note, settings);
   const patterns = capturePatterns(repo, start);
   run.lint = patterns.lint;
   run.patternSnapshot = patterns.id;
@@ -155,27 +188,7 @@ export async function projectCheck(repo: Repo, note: string) {
     }
   }
 
-  for (const kind of ["accessibility", "security"] as const) {
-    run.phase = kind;
-    saveRun(repo, run);
-
-    try {
-      Object.assign(
-        run,
-        await boundedSourceCheck({
-          root: repo.root,
-          kind,
-          minimum:
-            kind === "security"
-              ? settings.minSecurityScore
-              : settings.minAccessibilityScore,
-          colorMinimum: settings.minColorblindScore,
-        }),
-      );
-    } catch (error) {
-      run.error = [run.error, String(error)].filter(Boolean).join("; ");
-    }
-  }
+  await checkSources(repo, run, settings);
 
   run.phase = "complete";
   run.completedAt = new Date().toISOString();
