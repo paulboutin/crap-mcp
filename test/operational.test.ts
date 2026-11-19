@@ -355,6 +355,38 @@ function boundEvidence(repo: ReturnType<typeof repository>) {
   return evidence;
 }
 
+test("development workload imports preserve incomplete evidence and never compare across execution modes", (t) => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "crap-development-")));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const repo = makeRepo(dir);
+  setPolicy(repo);
+  const original = boundEvidence(repo);
+  const prior = importOperational(repo, original);
+  const priorSnapshot = operationalSnapshot(repo, prior.snapshot!);
+
+  const development = operationalEvidence.parse({
+    ...original,
+    mode: "development",
+    environment: "shared-development",
+    status: "incomplete",
+    telemetryComplete: false,
+  });
+
+  const report = importOperational(repo, development);
+  assert.equal(report.evidence?.mode, "development");
+  assert.ok(report.axes.every((axis) => axis.score === null));
+  assert.notEqual(report.snapshot, prior.snapshot);
+  assert.deepEqual(operationalSnapshot(repo, prior.snapshot!), priorSnapshot);
+  assert.equal(compareOperational(development, development).comparable, true);
+
+  for (const mode of ["synthetic", "local", "staging", "production"] as const) {
+    const changed = operationalEvidence.parse({ ...development, mode });
+    const comparison = compareOperational(development, changed, true);
+    assert.equal(comparison.comparable, false);
+    assert.deepEqual(comparison.mismatches, ["mode"]);
+  }
+});
+
 test("imports bind source/project/policy, preserve failed harness evidence, immutable snapshots and shared policies", (t) => {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "crap-operational-")));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
