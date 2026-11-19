@@ -31,6 +31,26 @@
   "changes": [],
   "lessons": [
     {
+      "before": "2026-11-19T21:41:06.011Z",
+      "after": "2026-11-19T21:43:27.643Z",
+      "finding": "The operational evidence mode enum omitted deployed development workloads, preventing accurate imports without relabeling their execution environment.",
+      "conclusion": "Added explicit development mode while preserving legacy v1 hashes and rejecting cross-mode comparisons. Before and after project checks passed with unchanged measured CRAP; this is schema correctness, not a demonstrated runtime improvement.",
+      "nextRule": "When extending operational execution modes, test legacy hash stability, prior-record preservation, incomplete evidence remaining unscored, and cross-mode comparison rejection. The collector host does not define the workload environment.",
+      "evidence": [
+        "Suite unit: passed · check passed",
+        "Before 2026-11-19T21:41:06.011Z (passed, unit tests passed) → after 2026-11-19T21:43:27.643Z (passed)",
+        "Highest measured CRAP: 23.59 → 23.59 (736/736 → 736/736 functions scored)",
+        "Replay 48 TypeScript functions · qa: passed → passed",
+        "Parse the fixture ten times · benchmark: passed → passed",
+        "Median 29.82 ms across 5 samples (previous 21.37 ms, change 8.45 ms)",
+        "Session health: Not applicable · no surviving changed functions\n0/0 remaining affected functions scored; 0 removed; 0 files unassessed.\nFinding changes: none."
+      ],
+      "beforeSnapshot": "8a620bbcce6caeb56ff9c7b775a14cba8b4ae0c9a94b1a21ef064622f23f9888",
+      "afterSnapshot": "7a4fc86ef9c108f1942ca83361672b702a2f617330e2802941c51f3ef7298efc",
+      "beforeCommit": "233068d418e9997e672feece906019a1f2b9ad55",
+      "afterCommit": "233068d418e9997e672feece906019a1f2b9ad55"
+    },
+    {
       "before": "2026-11-07T22:18:18.806Z",
       "after": "2026-11-07T22:23:47.024Z",
       "finding": "src/check-comparison.ts · compareChecks mixed workload matching, formatting and risk comparison",
