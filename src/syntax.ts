@@ -218,17 +218,41 @@ export function withSyntax<T>(
   id: string,
   source: string,
   inspect: (root: Node) => T,
+  budgetMs = 5000,
 ) {
-  const tree = parsers.get(adapter(id).version)!.parse(source);
+  // Independent files get independent external-scanner state, including after errors.
+  const parser = new Parser().setLanguage(
+    parsers.get(adapter(id).version)!.language,
+  );
 
-  if (!tree) throw Error("Parser did not produce a tree");
+  const deadline = performance.now() + budgetMs;
+  let expired = false;
 
   try {
-    if (tree.rootNode.hasError)
-      throw Error("Syntax error or unsupported grammar");
+    const tree = parser.parse(source, undefined, {
+      progressCallback: () => {
+        expired = performance.now() >= deadline;
 
-    return inspect(tree.rootNode);
+        return expired;
+      },
+    });
+
+    if (!tree)
+      throw Error(
+        expired
+          ? `Parser exceeded ${budgetMs} ms budget; source unassessed`
+          : "Parser did not produce a tree",
+      );
+
+    try {
+      if (tree.rootNode.hasError)
+        throw Error("Syntax error or unsupported grammar");
+
+      return inspect(tree.rootNode);
+    } finally {
+      tree.delete();
+    }
   } finally {
-    tree.delete();
+    parser.delete();
   }
 }
